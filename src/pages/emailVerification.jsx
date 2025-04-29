@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft, ChevronLeft } from 'lucide-react';
 
 const EmailVerification = () => {
   const [activeTab, setActiveTab] = useState('request');
@@ -166,17 +166,6 @@ const EmailVerification = () => {
           </button>
         </div>
 
-        {/* Back button for verify and reset tabs */}
-        {(activeTab === 'verify' || activeTab === 'reset') && (
-          <button
-            onClick={handleGoBack}
-            className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
-          >
-            <ArrowLeft className="h-5 w-5 mr-1" />
-            Back
-          </button>
-        )}
-
         {/* Request Code Tab */}
         {activeTab === 'request' && (
           <div>
@@ -283,6 +272,9 @@ const EmailVerification = () => {
             </div>
           </div>
         )}
+        <Link to={'/login'} className="text-green-500 mt-2 flex justify-center">
+          Back to login
+        </Link>
       </div>
     </div>
   );

@@ -16,20 +16,15 @@ export default function BornRecordsReport() {
   const API_BASE_URL = import.meta.env.VITE_API_KEY;
   const token = Cookies.get('token');
 
-  // Fetch born records with date filters
-  // Update the formatDateForAPI function in your BornRecordsReport component
   const formatDateForAPI = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0'); // Keep months with leading zero
-    const day = date.getDate(); // Days will be without leading zero
-
-    // Return in format YYYY-MM-D (with leading zero for month but not day)
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = date.getDate();
     return `${year}-${month}-${day}`;
   };
 
-  // The fetchBornRecords function remains the same as before
   const fetchBornRecords = async () => {
     try {
       setIsLoading(true);
@@ -58,16 +53,13 @@ export default function BornRecordsReport() {
     }
   };
 
-  // Format date for display
   const formatDisplayDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString();
   };
 
-  // Export to Excel
   const exportToExcel = () => {
-    // Prepare data for export
     const exportData = bornRecords.map((record) => ({
       'Date of Birth': formatDisplayDate(record.dateOfBirth),
       'Health Center': record.healthCenter,
@@ -82,14 +74,9 @@ export default function BornRecordsReport() {
       Status: record.appointments[0]?.feedback[0]?.status || 'N/A',
     }));
 
-    // Create worksheet
     const ws = XLSX.utils.json_to_sheet(exportData);
-
-    // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Born Records');
-
-    // Export to file
     XLSX.writeFile(wb, `born_records_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -103,10 +90,62 @@ export default function BornRecordsReport() {
   const nextPage = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
   const prevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
 
-  // Initial load
   useEffect(() => {
     fetchBornRecords();
   }, []);
+
+  const formatDateToDMY = (dateString) => {
+    if (!dateString) return 'N/A';
+
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
+  };
+
+  // Skeleton Loader Components
+  const SummaryCardSkeleton = () => (
+    <div className="bg-gray-100 p-4 rounded-lg shadow animate-pulse">
+      <div className="h-4 w-3/4 bg-gray-300 rounded mb-2"></div>
+      <div className="h-8 w-1/2 bg-gray-300 rounded"></div>
+    </div>
+  );
+
+  const TableRowSkeleton = () => (
+    <tr>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+        </div>
+      </td>
+    </tr>
+  );
 
   return (
     <div className="bg-white min-h-screen p-6">
@@ -147,6 +186,7 @@ export default function BornRecordsReport() {
           <button
             onClick={fetchBornRecords}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors self-end"
+            disabled={isLoading}
           >
             <Search size={18} />
             Filter
@@ -157,13 +197,15 @@ export default function BornRecordsReport() {
           <button
             onClick={exportToExcel}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            disabled={isLoading || bornRecords.length === 0}
           >
             <Download size={18} />
             Export Excel
           </button>
           <button
             onClick={() => window.print()}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            className="bg-gray-600 hidden hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            disabled={isLoading || bornRecords.length === 0}
           >
             <Printer size={18} />
             Print
@@ -173,157 +215,159 @@ export default function BornRecordsReport() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-green-50 p-4 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-green-800">Total Births</h3>
-          <p className="text-2xl font-bold text-green-600">{summary.totalBirths || 0}</p>
-        </div>
-
-        {summary.birthsByDeliveryType &&
-          Object.entries(summary.birthsByDeliveryType).map(([type, count]) => (
-            <div key={type} className="bg-blue-50 p-4 rounded-lg shadow">
-              <h3 className="text-sm font-medium text-blue-800">{type} Births</h3>
-              <p className="text-2xl font-bold text-blue-600">{count}</p>
+        {isLoading ? (
+          <>
+            <SummaryCardSkeleton />
+            <SummaryCardSkeleton />
+            <SummaryCardSkeleton />
+            <SummaryCardSkeleton />
+          </>
+        ) : (
+          <>
+            <div className="bg-green-50 p-4 rounded-lg shadow">
+              <h3 className="text-sm font-medium text-green-800">Total Births</h3>
+              <p className="text-2xl font-bold text-green-600">{summary.totalBirths || 0}</p>
             </div>
-          ))}
+
+            {summary.birthsByDeliveryType &&
+              Object.entries(summary.birthsByDeliveryType).map(([type, count]) => (
+                <div key={type} className="bg-blue-50 p-4 rounded-lg shadow">
+                  <h3 className="text-sm font-medium text-blue-800">{type} Births</h3>
+                  <p className="text-2xl font-bold text-blue-600">{count}</p>
+                </div>
+              ))}
+          </>
+        )}
       </div>
 
       {/* Records Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {isLoading ? (
-          <div className="p-4 text-center">Loading...</div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-green-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                      Date of Birth
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                      Health Center
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                      Mother
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                      Delivery Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                      Baby Info
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                      Last Appointment
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {currentRecords.length > 0 ? (
-                    currentRecords.map((record) => (
-                      <tr key={record.bornId} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDisplayDate(record.dateOfBirth)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {record.healthCenter}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {record.motherName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {record.deliveryType}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {record.babies.map((baby) => (
-                            <div key={baby.babyName}>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-green-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
+                  Date of Birth
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
+                  Health Center
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
+                  Mother
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
+                  Delivery Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
+                  Baby Info
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
+                  Last Appointment
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {isLoading ? (
+                Array(5)
+                  .fill(0)
+                  .map((_, index) => <TableRowSkeleton key={`skeleton-${index}`} />)
+              ) : currentRecords.length > 0 ? (
+                currentRecords.map((record) => (
+                  <tr key={record.bornId} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDateToDMY(record.dateOfBirth)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {record.healthCenter}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {record.motherName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {record.deliveryType}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {record.babies.map((baby) => (
+                        <div key={baby.babyName}>
+                          <p>
+                            <strong>Name:</strong> {baby.babyName}
+                          </p>
+                          <p>
+                            <strong>Gender:</strong> {baby.gender}
+                          </p>
+                          <p>
+                            <strong>Weight:</strong> {baby.birthWeight}g
+                          </p>
+                          <p>
+                            <strong>Medications:</strong> {baby.medications?.join(', ') || 'None'}
+                          </p>
+                        </div>
+                      ))}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {record.appointments.length > 0
+                        ? record.appointments[0].feedback.map((feedback, idx) => (
+                            <div key={idx}>
                               <p>
-                                <strong>Name:</strong> {baby.babyName}
+                                <strong>Date:</strong>{' '}
+                                {formatDateToDMY(record.appointments[0].appointmentDate)}
                               </p>
                               <p>
-                                <strong>Gender:</strong> {baby.gender}
-                              </p>
-                              <p>
-                                <strong>Weight:</strong> {baby.birthWeight}g
-                              </p>
-                              <p>
-                                <strong>Medications:</strong>{' '}
-                                {baby.medications?.join(', ') || 'None'}
+                                <strong>Status:</strong> {feedback.status}
                               </p>
                             </div>
-                          ))}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {record.appointments.length > 0
-                            ? record.appointments[0].feedback.map((feedback, idx) => (
-                                <div key={idx}>
-                                  <p>
-                                    <strong>Date:</strong>{' '}
-                                    {formatDisplayDate(record.appointments[0].appointmentDate)}
-                                  </p>
-                                  <p>
-                                    <strong>Status:</strong> {feedback.status}
-                                  </p>
-                                  <p>
-                                    <strong>Next Visit:</strong>{' '}
-                                    {formatDisplayDate(feedback.nextAppointmentDate)}
-                                  </p>
-                                </div>
-                              ))
-                            : 'No appointments'}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                        No records found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                          ))
+                        : 'No appointments'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                    No records found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {!isLoading && bornRecords.length > recordsPerPage && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium">{indexOfFirstRecord + 1}</span> to{' '}
+              <span className="font-medium">{Math.min(indexOfLastRecord, bornRecords.length)}</span>{' '}
+              of <span className="font-medium">{bornRecords.length}</span> records
             </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={prevPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded-md ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                <ChevronLeft size={20} />
+              </button>
 
-            {/* Pagination */}
-            {bornRecords.length > recordsPerPage && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-                <div className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{indexOfFirstRecord + 1}</span> to{' '}
-                  <span className="font-medium">
-                    {Math.min(indexOfLastRecord, bornRecords.length)}
-                  </span>{' '}
-                  of <span className="font-medium">{bornRecords.length}</span> records
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={prevPage}
-                    disabled={currentPage === 1}
-                    className={`px-3 py-1 rounded-md ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
+                <button
+                  key={number}
+                  onClick={() => paginate(number)}
+                  className={`px-3 py-1 rounded-md ${currentPage === number ? 'bg-green-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  {number}
+                </button>
+              ))}
 
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
-                    <button
-                      key={number}
-                      onClick={() => paginate(number)}
-                      className={`px-3 py-1 rounded-md ${currentPage === number ? 'bg-green-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                    >
-                      {number}
-                    </button>
-                  ))}
-
-                  <button
-                    onClick={nextPage}
-                    disabled={currentPage === totalPages}
-                    className={`px-3 py-1 rounded-md ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+              <button
+                onClick={nextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded-md ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

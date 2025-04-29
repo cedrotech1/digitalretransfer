@@ -255,7 +255,7 @@ function Sidebar({ sidebarOpen, toggleSidebar }) {
     },
   ];
 
-  const menuItems = role === 'admin' ? adminMenuItems : userMenuItems;
+  const menuItems = role === 'data_manager' ? adminMenuItems : userMenuItems;
 
   return (
     <>

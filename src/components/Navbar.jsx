@@ -46,7 +46,9 @@ function Navbar({ toggleSidebar }) {
         // Handle different response structures
         const data = response.data?.data || response.data || [];
         const unreadCount = response.data?.unreadCount || 0;
-
+        if (response.status === 404) {
+          console.log('no found');
+        }
         // Ensure data is an array before filtering
         const notifications = Array.isArray(data) ? data : [];
         setNotifications(notifications.filter((n) => !n?.isRead));

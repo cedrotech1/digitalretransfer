@@ -13,7 +13,8 @@ export default function HealthCenterManagement() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [currentCenter, setCurrentCenter] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Changed to true initially
+  const [isSectorsLoading, setIsSectorsLoading] = useState(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -23,6 +24,45 @@ export default function HealthCenterManagement() {
 
   const token = Cookies.get('token');
   const API_BASE_URL = import.meta.env.VITE_API_KEY;
+
+  // Skeleton Loader Components
+  const TableRowSkeleton = () => (
+    <tr className="animate-pulse">
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex items-center">
+          <div className="flex-shrink-0 h-8 w-8 bg-gray-200 rounded-full"></div>
+          <div className="ml-4 space-y-2">
+            <div className="h-4 bg-gray-200 rounded w-32"></div>
+            <div className="h-3 bg-gray-200 rounded w-24"></div>
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-24"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-32"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-6 w-6 bg-gray-200 rounded"></div>
+      </td>
+    </tr>
+  );
+
+  const InputSkeleton = () => (
+    <div className="space-y-1">
+      <div className="h-4 bg-gray-200 rounded w-24"></div>
+      <div className="h-10 bg-gray-200 rounded-md"></div>
+    </div>
+  );
+
+  const SelectSkeleton = () => (
+    <div className="space-y-1">
+      <div className="h-4 bg-gray-200 rounded w-24"></div>
+      <div className="h-10 bg-gray-200 rounded-md"></div>
+    </div>
+  );
+
   // Fetch health centers and sectors on component mount
   useEffect(() => {
     fetchHealthCenters();
@@ -51,8 +91,9 @@ export default function HealthCenterManagement() {
   };
 
   const fetchSectors = async () => {
+    setIsSectorsLoading(true);
     try {
-      const token = Cookies.get('token'); // Get token from cookies
+      const token = Cookies.get('token');
 
       const response = await axios.get(`${API_BASE_URL}/address/`, {
         headers: {
@@ -81,6 +122,8 @@ export default function HealthCenterManagement() {
     } catch (error) {
       console.error('Error fetching sectors:', error);
       showAlert('error', 'Failed to load sectors');
+    } finally {
+      setIsSectorsLoading(false);
     }
   };
 
@@ -254,8 +297,8 @@ export default function HealthCenterManagement() {
       head_of_community_workers_at_helth_center: roles.includes(
         'head_of_community_workers_at_helth_center'
       ),
-      pediatrition: roles.includes('pediatrition'),
-      admin: roles.includes('admin'),
+      pediatrition: roles.includes('doctor'),
+      admin: roles.includes('data_manager'),
     };
 
     setFormData({
@@ -310,34 +353,40 @@ export default function HealthCenterManagement() {
 
       {/* Filters and Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="relative w-full md:w-64">
-          <input
-            type="text"
-            placeholder="Search health centers..."
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500"
-            value={searchTerm}
-            onChange={handleSearch}
-          />
-          <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-        </div>
+        {isLoading ? (
+          <div className="relative w-full md:w-64 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+        ) : (
+          <div className="relative w-full md:w-64">
+            <input
+              type="text"
+              placeholder="Search health centers..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={searchTerm}
+              onChange={handleSearch}
+            />
+            <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+          </div>
+        )}
 
-        <button
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          onClick={() => {
-            resetForm();
-            setIsAddModalOpen(true);
-          }}
-          disabled={isLoading}
-        >
-          <Plus size={18} />
-          Add New Health Center
-        </button>
+        {isLoading ? (
+          <div className="h-10 w-40 bg-gray-200 rounded-lg animate-pulse"></div>
+        ) : (
+          <button
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            onClick={() => {
+              resetForm();
+              setIsAddModalOpen(true);
+            }}
+            disabled={isLoading}
+          >
+            <Plus size={18} />
+            Add New Health Center
+          </button>
+        )}
       </div>
 
       {/* Health Centers Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {isLoading && <div className="p-4 text-center text-gray-500">Loading...</div>}
-
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-green-50">
@@ -357,9 +406,14 @@ export default function HealthCenterManagement() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCenters.length > 0 ? (
-                filteredCenters.map((center, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+              {isLoading ? (
+                // Show skeleton loaders while loading
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRowSkeleton key={`skeleton-${index}`} />
+                ))
+              ) : filteredCenters.length > 0 ? (
+                filteredCenters.map((center) => (
+                  <tr key={center.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -374,12 +428,20 @@ export default function HealthCenterManagement() {
                       {getSectorName(center.sectorId)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-  {center?.head ? `${center.head.firstname} ${center.head.lastname}` : "Not Found"}
-</td>
-
+                      {center.head
+                        ? `${center.head.firstname} ${center.head.lastname}`
+                        : 'Not assigned'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      {/* <button
+                        className="text-green-600 hover:text-green-900"
+                        onClick={() => handleViewHealthCenter(center)}
+                        disabled={isLoading}
+                      >
+                        <Eye size={18} />
+                      </button> */}
                       <button
-                        className="text-red-600 hover:text-red-900 ml-3"
+                        className="text-red-600 hover:text-red-900"
                         onClick={() => handleDeleteHealthCenter(center.id)}
                         disabled={isLoading}
                       >
@@ -390,8 +452,8 @@ export default function HealthCenterManagement() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3" className="px-6 py-4 text-center text-gray-500">
-                    {isLoading ? 'Loading...' : 'No health centers found'}
+                  <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                    No health centers found
                   </td>
                 </tr>
               )}
@@ -416,39 +478,47 @@ export default function HealthCenterManagement() {
             </div>
 
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Health Center Name*
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+              {isLoading ? (
+                <InputSkeleton />
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Health Center Name*
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sector*</label>
-                <select
-                  name="sectorId"
-                  value={formData.sectorId}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                  required
-                  disabled={isLoading}
-                >
-                  <option value="">Select Sector</option>
-                  {sectors.map((sector) => (
-                    <option key={sector.id} value={sector.id}>
-                      {sector.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {isSectorsLoading ? (
+                <SelectSkeleton />
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sector*</label>
+                  <select
+                    name="sectorId"
+                    value={formData.sectorId}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                    disabled={isLoading}
+                  >
+                    <option value="">Select Sector</option>
+                    {sectors.map((sector) => (
+                      <option key={sector.id} value={sector.id}>
+                        {sector.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-2">
@@ -526,21 +596,25 @@ export default function HealthCenterManagement() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sector</label>
                 {isEditMode ? (
-                  <select
-                    name="sectorId"
-                    value={formData.sectorId}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                    required
-                    disabled={isLoading}
-                  >
-                    <option value="">Select Sector</option>
-                    {sectors.map((sector) => (
-                      <option key={sector.id} value={sector.id}>
-                        {sector.name}
-                      </option>
-                    ))}
-                  </select>
+                  isSectorsLoading ? (
+                    <SelectSkeleton />
+                  ) : (
+                    <select
+                      name="sectorId"
+                      value={formData.sectorId}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                      disabled={isLoading}
+                    >
+                      <option value="">Select Sector</option>
+                      {sectors.map((sector) => (
+                        <option key={sector.id} value={sector.id}>
+                          {sector.name}
+                        </option>
+                      ))}
+                    </select>
+                  )
                 ) : (
                   <p className="text-gray-800">{getSectorName(currentCenter.sectorId)}</p>
                 )}

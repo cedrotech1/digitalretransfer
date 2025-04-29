@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Search, Trash2, Eye, X, Check, Bell, BellOff, Mail, MailOpen, Trash, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  Search,
+  Trash2,
+  Eye,
+  X,
+  Check,
+  Bell,
+  BellOff,
+  Mail,
+  MailOpen,
+  Trash,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import Swal from 'sweetalert2';
@@ -33,7 +46,7 @@ const NotificationsPage = () => {
   // Filter and sort notifications based on search term and sort order
   useEffect(() => {
     let filtered = [...notifications];
-    
+
     // Apply search filter
     if (searchTerm.trim() !== '') {
       filtered = filtered.filter(
@@ -44,14 +57,14 @@ const NotificationsPage = () => {
             notification.message.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
-    
+
     // Apply sorting
     filtered.sort((a, b) => {
       const dateA = new Date(a.createdAt);
       const dateB = new Date(b.createdAt);
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
-    
+
     setFilteredNotifications(filtered);
   }, [searchTerm, notifications, sortOrder]);
 
@@ -68,13 +81,13 @@ const NotificationsPage = () => {
           const dateB = new Date(b.createdAt);
           return dateB - dateA; // Newest first by default
         });
-        
+
         setNotifications(sortedData);
         setFilteredNotifications(sortedData);
         setUnreadCount(data.unreadCount || 0);
       }
     } catch (err) {
-      showAlert('error', err.response?.data?.message || err.message);
+      console.log('error', err.response?.data?.message || err.message);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +95,7 @@ const NotificationsPage = () => {
 
   // Toggle sort order
   const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest');
+    setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'));
   };
 
   // View notification (marks as read when opened)
@@ -95,7 +108,7 @@ const NotificationsPage = () => {
       setIsModalOpen(true);
       await fetchNotifications(); // Refresh to update read status
     } catch (err) {
-      showAlert('error', err.response?.data?.message || err.message);
+      console.log('error', err.response?.data?.message || err.message);
     }
   };
 
@@ -164,28 +177,49 @@ const NotificationsPage = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) {
       return `${diffInSeconds} second${diffInSeconds !== 1 ? 's' : ''} ago`;
     }
-    
+
     const diffInMinutes = Math.floor(diffInSeconds / 60);
     if (diffInMinutes < 60) {
       return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
     }
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) {
       return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
     }
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) {
       return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
     }
-    
+
     return date.toLocaleDateString();
   };
+
+  // Skeleton loader component for table rows
+  const SkeletonRow = () => (
+    <tr>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-5 w-5 bg-gray-200 rounded animate-pulse"></div>
+      </td>
+    </tr>
+  );
 
   return (
     <div className="bg-white min-h-screen p-6">
@@ -254,8 +288,6 @@ const NotificationsPage = () => {
 
       {/* Notifications Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {isLoading && <div className="p-4 text-center text-gray-500">Loading notifications...</div>}
-
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-green-50">
@@ -270,7 +302,7 @@ const NotificationsPage = () => {
                   Preview
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
-                  <button 
+                  <button
                     onClick={toggleSortOrder}
                     className="flex items-center hover:text-green-800"
                   >
@@ -288,7 +320,12 @@ const NotificationsPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredNotifications.length > 0 ? (
+              {isLoading ? (
+                // Show skeleton loaders when loading
+                Array(5)
+                  .fill(0)
+                  .map((_, index) => <SkeletonRow key={`skeleton-${index}`} />)
+              ) : filteredNotifications.length > 0 ? (
                 filteredNotifications.map((notification) => (
                   <tr
                     key={notification.id}
@@ -315,7 +352,10 @@ const NotificationsPage = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500" title={formatDate(notification.createdAt)}>
+                      <div
+                        className="text-sm text-gray-500"
+                        title={formatDate(notification.createdAt)}
+                      >
                         {formatRelativeTime(notification.createdAt)}
                       </div>
                     </td>
@@ -336,7 +376,7 @@ const NotificationsPage = () => {
               ) : (
                 <tr>
                   <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                    {isLoading ? 'Loading...' : 'No notifications found'}
+                    No notifications found
                   </td>
                 </tr>
               )}

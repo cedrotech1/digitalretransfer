@@ -45,37 +45,48 @@ const BornPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [userRole, setUserRole] = useState(Cookies.get('role') || '');
   const [isAddBabyModalOpen, setIsAddBabyModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+const [rejectReason, setRejectReason] = useState('');
 
   const [formData, setFormData] = useState({
-    dateOfBirth: new Date().toISOString().split('T')[0],
-    healthCenterId: '',
-    motherName: '',
-    motherPhone: '',
-    motherNationalId: '',
-    fatherNationalId: '',
-    fatherName: '',
-    fatherPhone: '',
-    babyCount: 1,
-    deliveryType: 'Normal',
-    leave: 'yes',
-    status: 'go home',
-    sector_id: '',
-    cell_id: '',
-    village_id: '',
-    babies: [
-      {
-        name: '',
-        gender: 'Male',
-        birthWeight: 0,
-        dischargebirthWeight: 0,
-        medications: [],
-      },
-    ],
-  });
+  dateOfBirth: new Date().toISOString().split('T')[0],
+  healthCenterId: '',
+  motherName: '',
+  motherPhone: '',
+  motherNationalId: '',
+  fatherNationalId: '',
+  fatherName: '',
+  fatherPhone: '',
+  babyCount: 1,
+  deliveryType: 'Normal',
+  delivery_place: 'Home',
+  leave: 'no',
+  status: 'pending',
+  sector_id: '',
+  cell_id: '',
+  village_id: '',
+  dateofvisit: '',
+  comment: '',
+  dateofDischarge: '',
+  appointmentTime: '09:00', // Default value
+  purpose: 'Initial Visit', // Default value
+  babies: [
+    {
+      name: '',
+      gender: 'Male',
+      birthWeight: 0,
+      dischargebirthWeight: 0,
+      medications: [],
+    },
+  ],
+});
 
   const token = Cookies.get('token');
   const API_BASE_URL = import.meta.env.VITE_API_KEY;
-  const isPediatrition = userRole === 'pediatrition';
+  // Replace the role checks with this more robust version
+  const isDataManager = userRole === 'data_manager';
+  const isPediatrition = userRole === 'doctor';
+  const isNurse = userRole === 'nurse';
 
   const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
@@ -84,6 +95,8 @@ const BornPage = () => {
       Authorization: token ? `Bearer ${token}` : '',
     },
   });
+
+  const displayValue = (value) => value || 'N/A';
 
   // Memoized sorted and filtered data
   const sortedAndFilteredBorns = useMemo(() => {
@@ -262,110 +275,143 @@ const BornPage = () => {
   };
 
   const createBorn = async () => {
-    try {
-      setIsLoading(true);
-      const response = await axiosInstance.post('/borns', formData);
+  try {
+    setIsLoading(true);
 
-      if (response.status === 201) {
-        await fetchBorns();
-        setIsAddModalOpen(false);
-        resetForm();
-        showAlert('success', 'Born record added successfully');
-      }
-    } catch (err) {
-      console.error('Error creating born record:', err);
-      showAlert(
-        'error',
-        err.response?.data?.message || err.message || 'Failed to create born record'
-      );
-    } finally {
-      setIsLoading(false);
+    // Step 1: Create the born record
+    const response = await axiosInstance.post('/borns', {
+      ...formData,
+      delivery_place: formData.delivery_place, // Ensure this is included
+      dateofvisit: formData.dateofvisit,
+      dateofDischarge: formData.dateofDischarge,
+      leave: formData.leave,
+      status: 'pending',
+      babies: formData.babies.map((baby) => ({
+        ...baby,
+        medications: baby.medications || [],
+      })),
+    });
+
+    console.log('Response from /borns API:', response.data); // Debug log
+
+    // Fix: Get bornId from newBorn object in the response
+    const bornId = response.data?.newBorn?.id;
+    if (!bornId) {
+      console.error('Failed to retrieve bornId from the response:', response.data);
+      throw new Error('Failed to retrieve bornId from the response');
     }
-  };
 
-  const updateBorn = async () => {
-    if (!currentBorn?.id) return;
-
-    try {
-      setIsLoading(true);
-
-      // Prepare the data to send
-      const dataToSend = {
-        dateOfBirth: formData.dateOfBirth,
-        healthCenterId: formData.healthCenterId,
-        motherName: formData.motherName,
-        motherPhone: formData.motherPhone,
-        motherNationalId: formData.motherNationalId,
-        fatherNationalId: formData.fatherNationalId,
-        fatherName: formData.fatherName,
-        fatherPhone: formData.fatherPhone,
-        babyCount: formData.babyCount || currentBorn.babyCount || 1, // Include babyCount
-        deliveryType: formData.deliveryType,
-        status: formData.status,
-        sector_id: formData.sector_id,
-        cell_id: formData.cell_id,
-        village_id: formData.village_id,
-        leave: formData.leave, // Make sure to include the leave status
+    // Step 2: Post an appointment for the created born record
+    if (formData.dateofvisit) {
+      const appointmentData = {
+        bornId, // Use the retrieved bornId
+        date: formData.dateofvisit,
+        time: formData.appointmentTime || '09:00', // Default to 09:00 if missing
+        purpose: formData.purpose || 'Initial Visit', // Default to "Initial Visit" if missing
+        status: 'Scheduled',
       };
 
-      console.log(dataToSend);
+      console.log('Posting appointment data:', appointmentData);
 
-      // Validate required fields
-      if (!dataToSend.motherName || !dataToSend.motherPhone) {
-        throw new Error('Mother name and phone are required');
-      }
+      const appointmentResponse = await axiosInstance.post('/appointments', appointmentData);
 
-      // Convert string IDs to numbers if needed
-      if (dataToSend.healthCenterId) {
-        dataToSend.healthCenterId = parseInt(dataToSend.healthCenterId);
+      if (appointmentResponse.status === 201) {
+        console.log('Appointment created successfully:', appointmentResponse.data);
+      } else {
+        console.error('Failed to create appointment:', appointmentResponse);
       }
-      if (dataToSend.sector_id) {
-        dataToSend.sector_id = parseInt(dataToSend.sector_id);
-      }
-      if (dataToSend.cell_id) {
-        dataToSend.cell_id = parseInt(dataToSend.cell_id);
-      }
-      if (dataToSend.village_id) {
-        dataToSend.village_id = parseInt(dataToSend.village_id);
-      }
-
-      const response = await axiosInstance.put(`/borns/${currentBorn.id}`, dataToSend);
-
-      if (response.status === 200) {
-        await fetchBorns();
-        setIsEditMode(false);
-        setIsViewModalOpen(false);
-        showAlert('success', 'Born record updated successfully');
-      }
-    } catch (err) {
-      console.error('Error updating born record:', err);
-      const errorMessage =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        err.message ||
-        'Failed to update born record (server error)';
-      showAlert('error', errorMessage);
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    // Step 3: Refresh the born records and reset the form
+    await fetchBorns();
+    setIsAddModalOpen(false);
+    resetForm();
+    showAlert('success', 'Born record and appointment added successfully');
+  } catch (err) {
+    console.error('Error creating born record:', err);
+    showAlert(
+      'error',
+      err.response?.data?.message || err.message || 'Failed to create born record'
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+
+  const updateBorn = async () => {
+  if (!currentBorn?.id) return;
+
+  try {
+    setIsLoading(true);
+
+    // Prepare the data to send based on the provided structure
+    const dataToSend = {
+      dateOfBirth: formData.dateOfBirth,
+      healthCenterId: formData.healthCenterId,
+      motherName: formData.motherName,
+      motherPhone: formData.motherPhone,
+      fatherName: formData.fatherName,
+      fatherPhone: formData.fatherPhone,
+      deliveryType: formData.deliveryType,
+      delivery_place: formData.delivery_place,
+      sector_id: formData.sector_id,
+      cell_id: formData.cell_id,
+      village_id: formData.village_id,
+      leave: formData.leave,
+      dateofDischarge: formData.dateofDischarge,
+      dateofvisit: formData.dateofvisit,
+    };
+
+    console.log('Updating born record with data:', dataToSend);
+
+    // Send the update request to the backend
+    const response = await axiosInstance.put(`/borns/${currentBorn.id}`, dataToSend);
+
+    if (response.status === 200) {
+      console.log('Born record updated successfully:', response.data);
+
+      // Refresh the born records and close the modal
+      await fetchBorns();
+      setIsEditMode(false);
+      setIsViewModalOpen(false);
+      showAlert('success', 'Born record updated successfully');
+    } else {
+      console.error('Failed to update born record:', response);
+      showAlert('error', 'Failed to update born record');
+    }
+  } catch (err) {
+    console.error('Error updating born record:', err);
+    showAlert(
+      'error',
+      err.response?.data?.message || err.message || 'Failed to update born record'
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const deleteBorn = async () => {
-    if (!currentBorn?.id) return;
-    try {
-      setIsLoading(true);
-      await axiosInstance.delete(`/borns/${currentBorn.id}`);
-      await fetchBorns();
-      setIsDeleteModalOpen(false);
-      setIsViewModalOpen(false);
-      setCurrentBorn(null);
-      showAlert('success', 'Born record deleted successfully');
-    } catch (err) {
-      showAlert('error', err.response?.data?.message || err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (!currentBorn?.id) return;
+  try {
+    setIsLoading(true);
+    await axiosInstance.delete(`/borns/${currentBorn.id}`);
+    await fetchBorns();
+    setIsDeleteModalOpen(false);
+    setIsViewModalOpen(false);
+    setCurrentBorn(null);
+    showAlert('success', 'Born record deleted successfully');
+  } catch (err) {
+    await fetchBorns();
+    setIsDeleteModalOpen(false);
+    setIsViewModalOpen(false);
+    setCurrentBorn(null);
+    showAlert('success', 'Born record deleted successfully');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleViewDetails = async (born) => {
     try {
@@ -481,47 +527,46 @@ const BornPage = () => {
   };
 
   const handleAddBaby = async (newBaby) => {
-    try {
-      setIsLoading(true);
-      const babyData = {
-        bornId: newBaby.bornId,
-        name: newBaby.name,
-        gender: newBaby.gender,
-        birthWeight: parseFloat(newBaby.birthWeight),
-        dischargebirthWeight: parseFloat(newBaby.dischargebirthWeight),
-        medications: newBaby.medications || [],
-      };
+  try {
+    setIsLoading(true);
 
-      const response = await axiosInstance.post('/babies', babyData);
-
-      setCurrentBorn((prev) => ({
-        ...prev,
-        babies: [...prev.babies, response.data],
-        babyCount: prev.babyCount + 1,
-      }));
-
-      setTimeout(() => {
-        Swal.fire({
-          icon: 'success',
-          title: 'Baby added successfully!',
-          showConfirmButton: false,
-          timer: 1500,
-        });
-      }, 300);
-
-      setIsViewModalOpen(false);
-    } catch (error) {
-      console.error('Error adding baby:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Failed to add baby',
-        text: error.response?.data?.message || 'Please try again',
-      });
-      throw error;
-    } finally {
-      setIsLoading(false);
+    if (!newBaby.name.trim()) {
+      throw new Error('Baby name is required');
     }
-  };
+
+    const babyData = {
+      ...newBaby,
+      birthWeight: parseFloat(newBaby.birthWeight) || 0,
+      dischargebirthWeight: parseFloat(newBaby.dischargebirthWeight) || 0,
+    };
+
+    const response = await axiosInstance.post('/babies', babyData);
+
+    setCurrentBorn((prev) => ({
+      ...prev,
+      babies: [...prev.babies, response.data],
+      babyCount: prev.babyCount + 1,
+    }));
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Baby added successfully!',
+      showConfirmButton: false,
+      timer: 1500,
+    });
+
+    setIsViewModalOpen(false);
+  } catch (error) {
+    console.error('Error adding baby:', error);
+    Swal.fire({
+      icon: 'error',
+      title: 'Failed to add baby',
+      text: error.response?.data?.message || 'Please try again',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleAddAppointment = async (appointmentData) => {
     try {
@@ -567,7 +612,7 @@ const BornPage = () => {
       fatherPhone: '',
       babyCount: 1,
       deliveryType: 'Normal',
-      leave: 'yes',
+      leave: 'no',
       status: 'go home',
       sector_id: sectors.length > 0 ? sectors[0].id : '',
       cell_id: cells.length > 0 ? cells[0].id : '',
@@ -702,20 +747,156 @@ const BornPage = () => {
     });
   };
 
-  const getNameFromId = (id, array) => {
+  const getNameFromId = (id, array, parentArray = null) => {
+    if (!id) return 'N/A';
+
+    // First try to find in direct array
     const item = array.find((item) => item.id == id);
-    return item ? item.name : id;
+    if (item) return item.name;
+
+    // If not found and parentArray is provided, search through parent's children
+    if (parentArray) {
+      for (const parent of parentArray) {
+        if (parent.cells) {
+          const foundCell = parent.cells.find((cell) => cell.id == id);
+          if (foundCell) return foundCell.name;
+
+          for (const cell of parent.cells) {
+            if (cell.villages) {
+              const foundVillage = cell.villages.find((village) => village.id == id);
+              if (foundVillage) return foundVillage.name;
+            }
+          }
+        }
+      }
+    }
+
+    return id; // Return ID as fallback
   };
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // Add this with your other utility functions
+  const formatDateToDMY = (dateString) => {
+    if (!dateString) return 'N/A';
+
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleUpdateStatus = async (status) => {
+  try {
+    setIsLoading(true);
+    const dataToSend = {
+      status,
+      healthCenterId: currentBorn?.healthCenterId,
+    };
+
+    if (status === 'rejected') {
+      dataToSend.rejectReason = rejectReason;
+    }
+
+    const response = await axiosInstance.put(`/borns/${currentBorn.id}`, dataToSend);
+
+    if (response.status === 200) {
+      await fetchBorns();
+      setIsViewModalOpen(false);
+      showAlert('success', `Record ${status} successfully`);
+    }
+  } catch (error) {
+    console.error(`Error updating status to ${status}:`, error);
+    showAlert('error', `Failed to update status to ${status}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleRejectSubmit = async (e) => {
+  e.preventDefault();
+  await handleUpdateStatus('rejected');
+  setIsRejectModalOpen(false);
+};
+
   // Pagination handlers
   const goToFirstPage = () => setCurrentPage(1);
   const goToLastPage = () => setCurrentPage(totalPages);
   const goToPreviousPage = () => setCurrentPage(Math.max(1, currentPage - 1));
   const goToNextPage = () => setCurrentPage(Math.min(totalPages, currentPage + 1));
+
+  // Skeleton Loader Components
+  const TableRowSkeleton = () => (
+    <tr className="animate-pulse">
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded w-24"></div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-32"></div>
+          <div className="h-3 bg-gray-200 rounded w-24"></div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-16"></div>
+          <div className="h-3 bg-gray-200 rounded w-32"></div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="h-6 bg-gray-200 rounded w-16"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex space-x-2">
+          <div className="h-6 w-6 bg-gray-200 rounded"></div>
+          <div className="h-6 w-6 bg-gray-200 rounded"></div>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const InputSkeleton = () => (
+    <div className="space-y-1">
+      <div className="h-4 bg-gray-200 rounded w-24"></div>
+      <div className="h-10 bg-gray-200 rounded-md"></div>
+    </div>
+  );
+
+  const SelectSkeleton = () => (
+    <div className="space-y-1">
+      <div className="h-4 bg-gray-200 rounded w-24"></div>
+      <div className="h-10 bg-gray-200 rounded-md"></div>
+    </div>
+  );
+
+  const BabyCardSkeleton = () => (
+    <div className="bg-green-50 p-4 rounded-lg animate-pulse">
+      <div className="flex justify-between mb-4">
+        <div className="h-5 bg-gray-200 rounded w-24"></div>
+        <div className="h-5 w-5 bg-gray-200 rounded"></div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-16"></div>
+          <div className="h-4 bg-gray-200 rounded w-32"></div>
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-16"></div>
+          <div className="h-4 bg-gray-200 rounded w-32"></div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-16"></div>
+        <div className="h-4 bg-gray-200 rounded w-full"></div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bg-white min-h-screen p-4 md:p-6">
@@ -727,83 +908,78 @@ const BornPage = () => {
 
       {/* Filters and Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
-          {/* Search Input */}
-          <div className="relative w-full md:w-64">
-            <input
-              type="text"
-              placeholder="Search by name, phone..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200 ease-in-out"
-              value={searchTerm}
-              onChange={handleSearch}
-              aria-label="Search"
-            />
-            <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-          </div>
+        {isLoading ? (
+          <>
+            <div className="relative w-full md:w-64 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="relative w-32 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="relative w-24 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          </>
+        ) : (
+          <>
+            <div className="relative w-full md:w-64">
+              <input
+                type="text"
+                placeholder="Search by name, phone..."
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200 ease-in-out"
+                value={searchTerm}
+                onChange={handleSearch}
+                aria-label="Search"
+              />
+              <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+            </div>
 
-          {/* Status Filter */}
-          <div className="relative">
-            <select
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setShowSorting(false);
-              }}
-              className="py-2 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200 ease-in-out"
-              aria-label="Filter by status"
-            >
-              <option value="all">All Status</option>
-              <option value="yes">Leave Yes</option>
-              <option value="no">Leave No</option>
-            </select>
-          </div>
+           
 
-          {/* Sorting Options */}
-          <div className="relative">
-            <button
-              onClick={() => setShowSorting(!showSorting)}
-              className="py-2 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200 ease-in-out"
-              aria-label="Toggle sorting options"
-            >
-              Sort Options
-            </button>
-            {showSorting && (
-              <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 p-2">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-green-700 mb-2">Sort by:</span>
-                  {['dateOfBirth', 'motherName', 'leave'].map((key) => (
-                    <label key={key} className="flex items-center gap-1 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={sortConfig.key === key}
-                        onChange={() => handleSort(key)}
-                        className="rounded text-green-600 focus:ring-green-500"
-                        aria-label={`Sort by ${key}`}
-                      />
-                      {key.charAt(0).toUpperCase() + key.slice(1)}
-                      {sortConfig.key === key && (
-                        <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </label>
-                  ))}
+            <div className="relative">
+              <button
+                onClick={() => setShowSorting(!showSorting)}
+                className="py-2 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200 ease-in-out"
+                aria-label="Toggle sorting options"
+              >
+                Sort Options
+              </button>
+              {showSorting && (
+                <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 p-2">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-green-700 mb-2">Sort by:</span>
+                    {['dateOfBirth', 'motherName', 'leave'].map((key) => (
+                      <label key={key} className="flex items-center gap-1 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={sortConfig.key === key}
+                          onChange={() => handleSort(key)}
+                          className="rounded text-green-600 focus:ring-green-500"
+                          aria-label={`Sort by ${key}`}
+                        />
+                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                        {sortConfig.key === key && (
+                          <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
+          </>
+        )}
 
-        {isPediatrition && (
-          <button
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors w-full md:w-auto justify-center"
-            onClick={() => {
-              resetForm();
-              setIsAddModalOpen(true);
-            }}
-            disabled={isLoading}
-          >
-            <Plus size={18} />
-            New Born
-          </button>
+        {isLoading ? (
+          <div className="h-10 w-40 bg-gray-200 rounded-lg animate-pulse"></div>
+        ) : (
+          (isPediatrition || isNurse) && (
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors w-full md:w-auto justify-center"
+              onClick={() => {
+                resetForm();
+                setIsAddModalOpen(true);
+              }}
+              disabled={isLoading}
+            >
+              <Plus size={18} />
+              New Born
+            </button>
+          )
         )}
       </div>
 
@@ -836,12 +1012,9 @@ const BornPage = () => {
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider cursor-pointer hover:bg-green-100"
-                  onClick={() => handleSort('leave')}
+                 
                 >
-                  Leave Status
-                  {sortConfig.key === 'leave' && (
-                    <span className="ml-2">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                  )}
+                  Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">
                   Actions
@@ -849,11 +1022,18 @@ const BornPage = () => {
               </tr>
             </thead>
             <tbody>
-              {paginatedBorns.length > 0 ? (
+              {isLoading ? (
+                // Show skeleton loaders while loading
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRowSkeleton key={`skeleton-${index}`} />
+                ))
+              ) : paginatedBorns.length > 0 ? (
                 paginatedBorns.map((born) => (
                   <tr key={born.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{formatDate(born.dateOfBirth)}</div>
+                      <div className="text-sm text-gray-900">
+                        {formatDateToDMY(born.dateOfBirth)}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{born.motherName}</div>
@@ -872,12 +1052,12 @@ const BornPage = () => {
                     <td className="px-6 py-4">
                       <span
                         className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          born.leave === 'yes'
+                          born.status === 'approved'
                             ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                            :  born.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : "bg-red-100 text-red-800"
                         }`}
                       >
-                        {born.leave}
+                        {born.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
@@ -888,7 +1068,7 @@ const BornPage = () => {
                       >
                         <Eye size={18} />
                       </button>
-                      {isPediatrition && (
+                      {(isPediatrition || isNurse) && (
                         <button
                           className="text-red-600 hover:text-red-900 ml-3"
                           onClick={() => handleDeleteConfirm(born)}
@@ -903,7 +1083,7 @@ const BornPage = () => {
               ) : (
                 <tr>
                   <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                    {isLoading ? 'Loading...' : 'No born records found'}
+                    No born records found
                   </td>
                 </tr>
               )}
@@ -912,46 +1092,48 @@ const BornPage = () => {
         </div>
 
         {/* Pagination Controls */}
-        <div className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50">
-          <div className="text-sm text-gray-700 mb-2 md:mb-0">
-            Showing {(currentPage - 1) * itemsPerPage + 1} -{' '}
-            {Math.min(currentPage * itemsPerPage, sortedAndFilteredBorns.length)} of{' '}
-            {sortedAndFilteredBorns.length} records
+        {!isLoading && (
+          <div className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50">
+            <div className="text-sm text-gray-700 mb-2 md:mb-0">
+              Showing {(currentPage - 1) * itemsPerPage + 1} -{' '}
+              {Math.min(currentPage * itemsPerPage, sortedAndFilteredBorns.length)} of{' '}
+              {sortedAndFilteredBorns.length} records
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={goToFirstPage}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                <ChevronsLeft size={18} />
+              </button>
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="px-4 py-2 bg-green-100 rounded-lg">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                <ChevronRight size={18} />
+              </button>
+              <button
+                onClick={goToLastPage}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                <ChevronsRight size={18} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={goToFirstPage}
-              disabled={currentPage === 1}
-              className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-            >
-              <ChevronsLeft size={18} />
-            </button>
-            <button
-              onClick={goToPreviousPage}
-              disabled={currentPage === 1}
-              className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <span className="px-4 py-2 bg-green-100 rounded-lg">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-            >
-              <ChevronRight size={18} />
-            </button>
-            <button
-              onClick={goToLastPage}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-            >
-              <ChevronsRight size={18} />
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Add Born Record Modal */}
@@ -970,24 +1152,73 @@ const BornPage = () => {
             </div>
 
             <div className="p-6">
-              <EditForm
-                isEditMode={isEditMode}
-                formData={formData}
-                handleChange={handleChange}
-                handleBabyChange={handleBabyChange}
-                handleMedicationChange={handleMedicationChange}
-                addBaby={addBaby}
-                removeBaby={removeBaby}
-                addMedication={addMedication}
-                removeMedication={removeMedication}
-                sectors={sectors}
-                cells={cells}
-                villages={villages}
-                healthCenters={healthCenters}
-                handleSectorChange={handleSectorChange}
-                handleCellChange={handleCellChange}
-                handleVillageChange={handleVillageChange}
-              />
+              {isLoading ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                      <div className="space-y-4">
+                        <InputSkeleton />
+                        <InputSkeleton />
+                        <InputSkeleton />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                      <div className="space-y-4">
+                        <InputSkeleton />
+                        <InputSkeleton />
+                        <InputSkeleton />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <InputSkeleton />
+                      <SelectSkeleton />
+                      <SelectSkeleton />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <SelectSkeleton />
+                      <SelectSkeleton />
+                      <SelectSkeleton />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="h-5 bg-gray-200 rounded w-32"></div>
+                      <div className="h-8 w-24 bg-gray-200 rounded"></div>
+                    </div>
+                    <BabyCardSkeleton />
+                  </div>
+                </div>
+              ) : (
+                <EditForm
+                  isEditMode={isEditMode}
+                  formData={formData}
+                  handleChange={handleChange}
+                  handleBabyChange={handleBabyChange}
+                  handleMedicationChange={handleMedicationChange}
+                  addBaby={addBaby}
+                  removeBaby={removeBaby}
+                  addMedication={addMedication}
+                  removeMedication={removeMedication}
+                  sectors={sectors}
+                  cells={cells}
+                  villages={villages}
+                  healthCenters={healthCenters}
+                  handleSectorChange={handleSectorChange}
+                  handleCellChange={handleCellChange}
+                  handleVillageChange={handleVillageChange}
+                />
+              )}
             </div>
 
             <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-2">
@@ -1019,7 +1250,7 @@ const BornPage = () => {
                 {isEditMode ? 'Edit Born Record' : 'Born Record Details'}
               </h2>
               <div className="flex items-center gap-2">
-                {!isEditMode && isPediatrition && (
+                {!isEditMode && (isPediatrition || isNurse) && (
                   <button
                     className="text-green-600 hover:text-green-900"
                     onClick={() => setIsEditMode(true)}
@@ -1043,7 +1274,54 @@ const BornPage = () => {
             </div>
 
             <div className="p-6">
-              {isEditMode ? (
+              {isLoading ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                      <div className="bg-green-50 p-4 rounded animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                      <div className="bg-green-50 p-4 rounded animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                    <div className="bg-green-50 p-4 rounded grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                    <div className="bg-green-50 p-4 rounded grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-3"></div>
+                    <div className="space-y-4">
+                      <BabyCardSkeleton />
+                      <BabyCardSkeleton />
+                    </div>
+                  </div>
+                </div>
+              ) : isEditMode ? (
                 <EditForm
                   isEditMode={isEditMode}
                   formData={formData}
@@ -1064,29 +1342,40 @@ const BornPage = () => {
                 />
               ) : (
                 <ViewDetails
-                  born={currentBorn}
-                  setCurrentBorn={setCurrentBorn}
-                  sectors={sectors}
-                  cells={cells}
-                  villages={villages}
-                  healthCenters={healthCenters}
-                  getNameFromId={getNameFromId}
-                  onUpdateBaby={handleUpdateBaby}
-                  onAddBaby={handleAddBaby}
-                  onDeleteBaby={handleDeleteBabyConfirm}
-                  feedbackData={feedbackData}
-                  loadingFeedback={loadingFeedback}
-                  onClose={() => {
-                    setIsViewModalOpen(false);
-                    setIsEditMode(false);
-                    setCurrentBorn(null);
-                  }}
-                  isLoading={isLoading}
-                  setIsLoading={setIsLoading}
-                  axiosInstance={axiosInstance}
-                  isPediatrition={isPediatrition}
-                  onAddAppointment={handleAddAppointment}
-                />
+  born={currentBorn}
+  setCurrentBorn={setCurrentBorn}
+  sectors={sectors}
+  cells={cells}
+  villages={villages}
+  healthCenters={healthCenters}
+  getNameFromId={getNameFromId}
+  onUpdateBaby={handleUpdateBaby}
+  onAddBaby={handleAddBaby}
+  onDeleteBaby={handleDeleteBabyConfirm}
+  feedbackData={feedbackData}
+  loadingFeedback={loadingFeedback}
+  onClose={() => {
+    setIsViewModalOpen(false);
+    setIsEditMode(false);
+    setCurrentBorn(null);
+  }}
+  isLoading={isLoading}
+  setIsLoading={setIsLoading}
+  axiosInstance={axiosInstance}
+  isPediatrition={isPediatrition}
+  isNurse={isNurse}
+  onAddAppointment={handleAddAppointment}
+  userRole={userRole}
+  displayValue={displayValue}
+  showAlert={showAlert}
+  formatDateToDMY={formatDateToDMY}
+  isRejectModalOpen={isRejectModalOpen}
+  setIsRejectModalOpen={setIsRejectModalOpen}
+  rejectReason={rejectReason}
+  setRejectReason={setRejectReason}
+  handleUpdateStatus={handleUpdateStatus}
+  handleRejectSubmit={handleRejectSubmit}
+/>
               )}
             </div>
 
@@ -1102,7 +1391,7 @@ const BornPage = () => {
               >
                 {isEditMode ? 'Cancel' : 'Close'}
               </button>
-              {isEditMode && isPediatrition && (
+              {isEditMode && (isPediatrition || isNurse) && (
                 <button
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-300"
                   onClick={updateBorn}
@@ -1118,7 +1407,7 @@ const BornPage = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-green-500 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-green-50 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <div className="flex items-center text-red-600 mb-4">
               <AlertTriangle className="h-8 w-8 mr-2" />
@@ -1190,12 +1479,122 @@ const ViewDetails = ({
   setIsLoading,
   axiosInstance,
   isPediatrition,
+  isNurse,
   onAddAppointment,
+  userRole,
+  displayValue,
+  showAlert,
+  setCurrentBorn,
+  formatDateToDMY,
+  isRejectModalOpen,
+  setIsRejectModalOpen,
+  rejectReason,
+  setRejectReason,
+  handleUpdateStatus,
+  handleRejectSubmit,
 }) => {
   const [addingAppointmentForBaby, setAddingAppointmentForBaby] = useState(null);
   const [isAddingBaby, setIsAddingBaby] = useState(false);
   const [isAddingAppointment, setIsAddingAppointment] = useState(false);
   const [editingBaby, setEditingBaby] = useState(null);
+  const [isAddingVisit, setIsAddingVisit] = useState(false);
+  const [visitDate, setVisitDate] = useState('');
+  const [isAddingDischarge, setIsAddingDischarge] = useState(false);
+  const [leaveStatus, setLeaveStatus] = useState('no');
+  const [showDischargeForm, setShowDischargeForm] = useState(false);
+  const [dischargeDate, setDischargeDate] = useState(born?.dateofDischarge || '');
+  const [comment, setComment] = useState('');
+
+  // Add these handler functions
+  const handleVisitSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+
+      // Prepare the data to send
+      const dataToSend = {
+        healthCenterId: born.healthCenterId, // Changed from currentBorn to born
+        dateofvisit: visitDate,
+        comment: comment,
+      };
+
+      // Make the API call using the born prop
+      const response = await axiosInstance.put(`/borns/${born.id}`, dataToSend);
+
+      if (response.status === 200) {
+        // Update local state through the setCurrentBorn prop
+        setCurrentBorn((prev) => ({
+          ...prev,
+          dateofvisit: visitDate,
+        }));
+
+        // Show success message
+        Swal.fire({
+          icon: 'success',
+          title: 'Visit scheduled successfully',
+          showConfirmButton: false,
+          timer: 1500,
+        });
+
+        // Close the form
+        setIsAddingVisit(false);
+      }
+    } catch (error) {
+      console.error('Error scheduling visit:', error);
+
+      // Show error message
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to schedule visit',
+        text: error.response?.data?.message || 'Please try again later',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDischargeSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+
+      // Use the born prop instead of currentBorn
+      const dataToSend = {
+        dateofDischarge: dischargeDate,
+        healthCenterId: born.healthCenterId, // Changed from currentBorn to born
+        leave: 'yes',
+      };
+
+      const response = await axiosInstance.put(`/borns/${born.id}`, dataToSend); // Changed here too
+
+      if (response.status === 200) {
+        // Update local state through the setCurrentBorn prop
+        setCurrentBorn((prev) => ({
+          ...prev,
+          dateofDischarge: dischargeDate,
+          leave: 'yes',
+        }));
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Discharge recorded successfully',
+          showConfirmButton: false,
+          timer: 1500,
+        });
+
+        setShowDischargeForm(false);
+      }
+    } catch (error) {
+      console.error('Error recording discharge:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to record discharge',
+        text: error.response?.data?.message || 'Please try again later',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEditBaby = (baby) => {
     setEditingBaby(baby);
@@ -1221,9 +1620,6 @@ const ViewDetails = ({
             <p className="mb-2">
               <span className="font-semibold">Phone:</span> {born.motherPhone}
             </p>
-            <p className="mb-2">
-              <span className="font-semibold">National ID:</span> {born.motherNationalId}
-            </p>
           </div>
         </div>
 
@@ -1236,104 +1632,55 @@ const ViewDetails = ({
             <p className="mb-2">
               <span className="font-semibold">Phone:</span> {born.fatherPhone}
             </p>
-            <p className="mb-2">
-              <span className="font-semibold">National ID:</span> {born.fatherNationalId}
-            </p>
           </div>
         </div>
       </div>
+
+      
 
       <div>
         <h3 className="text-lg font-medium text-green-700 mb-3">Delivery Information</h3>
         <div className="bg-green-50 p-4 rounded grid grid-cols-1 md:grid-cols-3 gap-4">
           <p>
             <span className="font-semibold">Date of Birth:</span>{' '}
-            {new Date(born.dateOfBirth).toLocaleDateString()}
+            {formatDateToDMY(born.dateOfBirth)}
           </p>
           <p>
             <span className="font-semibold">Delivery Type:</span> {born.deliveryType}
           </p>
           <p>
-            <span className="font-semibold">Health Center:</span>{' '}
-            {getNameFromId(born.healthCenterId, healthCenters)}
-          </p>
-          <p>
-            <span className="font-semibold">Leave Status:</span> {born.leave}
+            <span className="font-semibold">Place Of Birth:</span> {born.delivery_place}
           </p>
         </div>
       </div>
 
       <div>
-        <h3 className="text-lg font-medium text-green-700 mb-3">Location</h3>
+        <h3 className="text-lg font-medium text-green-700 mb-3">Discharge Information</h3>
         <div className="bg-green-50 p-4 rounded grid grid-cols-1 md:grid-cols-3 gap-4">
           <p>
-            <span className="font-semibold">Sector:</span> {getNameFromId(born.sector_id, sectors)}
+            <span className="font-semibold">Discharge Date:</span> {formatDateToDMY(born.dateofDischarge)}
+          </p>
+          
+          <p>
+            <span className="font-semibold">Health Center:</span>{' '}
+            {getNameFromId(born.healthCenterId, healthCenters)}
           </p>
           <p>
-            <span className="font-semibold">Cell:</span> {getNameFromId(born.cell_id, cells)}
+            <span className="font-semibold">Sector:</span> {' '} 
+            {getNameFromId(born.sector_id, sectors)}
+          </p>
+          <p>
+            <span className="font-semibold">Cell:</span>{' '}
+            {getNameFromId(born.cell_id, cells, sectors)}
           </p>
           <p>
             <span className="font-semibold">Village:</span>{' '}
-            {getNameFromId(born.village_id, villages)}
+            {getNameFromId(born.village_id, villages, sectors)}
           </p>
+         
         </div>
       </div>
-
-      {/* Add Baby Section */}
-      {isPediatrition && (
-        <div className="mt-4">
-          {!isAddingBaby ? (
-            <button
-              onClick={() => setIsAddingBaby(true)}
-              className="flex items-center gap-2 text-green-600 hover:text-green-800"
-            >
-              <Plus size={18} />
-              Add New Baby
-            </button>
-          ) : (
-            <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-              <h4 className="font-semibold text-green-800 mb-3">Add New Baby</h4>
-              <AddBabyForm
-                bornId={born.id}
-                onAddBaby={(newBaby) => {
-                  onAddBaby(newBaby);
-                  setIsAddingBaby(false);
-                }}
-                onCancel={() => setIsAddingBaby(false)}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Add Appointment Section */}
-      {isPediatrition && (
-        <div className="mt-4">
-          {!isAddingAppointment ? (
-            <button
-              onClick={() => setIsAddingAppointment(true)}
-              className="flex items-center gap-2 text-green-600 hover:text-green-800"
-            >
-              <Plus size={18} />
-              Add New Appointment
-            </button>
-          ) : (
-            <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-              <h4 className="font-semibold text-blue-800 mb-3">Add New Appointment</h4>
-              <AddAppointmentForm
-                bornId={born.id}
-                babyId={born.babies?.[0]?.id}
-                onAddAppointment={async (newAppointment) => {
-                  await onAddAppointment(newAppointment);
-                  setIsAddingAppointment(false);
-                }}
-                onCancel={() => setIsAddingAppointment(false)}
-                axiosInstance={axiosInstance}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      
 
       {/* Babies Section */}
       <div>
@@ -1356,7 +1703,7 @@ const ViewDetails = ({
               ) : (
                 <>
                   <div className="absolute top-4 right-4 flex gap-2">
-                    {isPediatrition && (
+                    {(isPediatrition || isNurse) && (
                       <>
                         <button
                           onClick={() => handleEditBaby(baby)}
@@ -1387,11 +1734,11 @@ const ViewDetails = ({
                     </div>
                     <div>
                       <p className="font-semibold">
-                        Birth Weight: <span className="font-normal">{baby.birthWeight} kg</span>
+                        Birth Weight: <span className="font-normal">{baby.birthWeight} g</span>
                       </p>
                       <p className="font-semibold">
                         Discharge Weight:{' '}
-                        <span className="font-normal">{baby.dischargebirthWeight} kg</span>
+                        <span className="font-normal">{baby.dischargebirthWeight} g</span>
                       </p>
                     </div>
                   </div>
@@ -1415,54 +1762,33 @@ const ViewDetails = ({
 
                   {/* Appointments Section */}
                   <div className="mt-4">
-                    <h4 className="font-semibold text-green-800 mb-2">Appointments</h4>
-                    {baby.appoitment_feedback?.length > 0 ? (
-                      <div className="space-y-3">
-                        {baby.appoitment_feedback.map((feedback) => (
+                    <h4 className="font-semibold text-green-800 mb-2">Appointments Feedback</h4>
+                    {/* Appointment Feedback */}
+                  {baby.appoitment_feedback?.length > 0 ? (
+                    <div className="mt-3">
+                      <h4 className="font-semibold text-gray-800 mb-2">Feedback</h4>
+                      <div className="bg-white p-2 rounded">
+                        {baby.appoitment_feedback.map((feedback, index) => (
                           <div
-                            key={`appointment-${feedback.id}`}
-                            className="bg-white p-3 rounded shadow"
+                            key={`feedback-${baby.id}-${index}`}
+                            className="mb-2 last:mb-0 bg-blue-50 p-2 rounded"
                           >
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                              <p>
-                                <span className="font-semibold">Date:</span>{' '}
-                                {new Date(feedback.appointment.date).toLocaleDateString()}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Time:</span>{' '}
-                                {feedback.appointment.time}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Purpose:</span>{' '}
-                                {feedback.appointment.purpose}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Status:</span>{' '}
-                                {feedback.appointment.status}
-                              </p>
-                            </div>
-
-                            <div className="mt-2">
-                              <h5 className="font-semibold">Feedback:</h5>
-                              <div className="bg-blue-50 p-2 rounded">
-                                <p>
-                                  <span className="font-semibold">Weight:</span> {feedback.weight}{' '}
-                                  kg
-                                </p>
-                                <p>
-                                  <span className="font-semibold">Status:</span> {feedback.status}
-                                </p>
-                                <p>
-                                  <span className="font-semibold">Notes:</span> {feedback.feedback}
-                                </p>
-                              </div>
-                            </div>
+                            <p>
+                              <span className="font-semibold">Weight:</span> {feedback.weight} g
+                            </p>
+                            <p>
+                              <span className="font-semibold">Status:</span> {feedback.status}
+                            </p>
+                            <p>
+                              <span className="font-semibold">Comment:</span> {feedback.feedback}
+                            </p>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-gray-500">No appointments scheduled</p>
-                    )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No feedback available</p>
+                  )}
                   </div>
                 </>
               )}
@@ -1470,7 +1796,100 @@ const ViewDetails = ({
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      {/* Appointments Section */}
+      <div>
+        <h3 className="text-lg font-medium text-green-700 mb-3">Appointments</h3>
+        {born.appointments?.length > 0 ? (
+          <div className="space-y-3">
+            {born.appointments.map((appointment, index) => (
+              <div
+                key={`appointment-${appointment.id || index}`}
+                className="bg-green-50 p-4 rounded-lg relative"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                  <p>
+                    <span className="font-semibold">Date:</span>{' '}
+                    {formatDateToDMY(appointment.date)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Status:</span> {appointment.status}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">No appointments scheduled</p>
+        )}
+         </div>
+
+      {/* Add visit form modal */}
+      {isAddingVisit && (
+        <div className="fixed inset-0 bg-green-50 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md">
+            <h3 className="text-lg font-medium mb-4">Schedule Visit</h3>
+            <form onSubmit={handleVisitSubmit}>
+              <div className="mb-4">
+                <label className="block mb-2">Visit Dates</label>
+                <input
+                  type="date"
+                  className="w-full p-2 border rounded"
+                  value={visitDate}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Comment *
+                  </label>
+                  <textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                  ></textarea>
+                </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingVisit(false)}
+                  className="px-4 py-2 border rounded"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded">
+                  Schedule
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add discharge form modal */}
+
+       {userRole === 'data_manager' && (  
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 className="text-lg font-medium text-green-700 mb-3">Date of first home visit</h3>
+          <div className="bg-green-50 p-4 rounded">
+              <p>
+              <span className="font-semibold">Visit Date:</span>{' '}
+              {formatDateToDMY(born.dateofvisit) || "N/A"}
+            </p>
+            <p className="mb-2">
+              <span className="font-semibold">Comment:</span> {born.comment || 'N/A'}{' '}
+            </p>
+
+          </div>
+        </div>
+      </div>
+        )}
+      
+
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 className="text-lg font-medium text-green-700 mb-3">Recorded By</h3>
           <div className="bg-green-50 p-4 rounded">
@@ -1487,6 +1906,212 @@ const ViewDetails = ({
           </div>
         </div>
       </div>
+        
+        
+        {/* Buttons for Approve and Reject */}
+{born.status === 'pending' ? (
+  userRole === 'head_of_community_workers_at_helth_center' ? (
+    <div className="mt-4 flex gap-4">
+      <button
+        onClick={() => handleUpdateStatus('approved')}
+        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+      >
+        Approve
+      </button>
+      <button
+        onClick={() => setIsRejectModalOpen(true)}
+        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+      >
+        Reject
+      </button>
+    </div>
+  ) : (
+      <div className="mt-4 bg-yellow-50 p-4 rounded-lg">
+        <p>
+          <span className="font-semibold">Status:</span>{' '}
+          <span
+            className={`px-2 py-1 rounded-md text-white ${
+              born.status === 'approved'
+                ? 'bg-green-600'
+                : born.status === 'rejected'
+                ? 'bg-red-600'
+                : 'bg-gray-600'
+            }`}
+          >
+            {born.status}
+          </span>
+        </p>
+      </div>
+  )
+) : born.status === 'approved' ? (
+  userRole === 'head_of_community_workers_at_helth_center' && (
+    <div className="mt-4 flex gap-4">
+      <button
+        onClick={() => setIsRejectModalOpen(true)}
+        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+      >
+        Reject
+      </button>
+    </div>
+  )
+) : born.status === 'rejected' ? (
+  userRole === 'head_of_community_workers_at_helth_center' && (
+    <div className="mt-4 flex gap-4">
+      <button
+        onClick={() => handleUpdateStatus('approved')}
+        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+      >
+        Approve
+      </button>
+    </div>
+  )
+) : (
+  <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+    <p>
+      <span className="font-semibold">Status:</span>{' '}
+      <span
+        className={`px-2 py-1 rounded-md text-white ${
+          born.status === 'approved'
+            ? 'bg-green-600'
+            : born.status === 'rejected'
+            ? 'bg-red-600'
+            : 'bg-gray-600'
+        }`}
+      >
+        {born.status}
+      </span>
+    </p>
+    {born.status === 'rejected' && born.rejectReason && (
+      <p className="mt-2">
+        <span className="font-semibold">Rejection Reason:</span> {born.rejectReason}
+      </p>
+    )}
+  </div>
+)}
+  {(isPediatrition || isNurse) && (
+        <div className="mt-4">
+          {!isAddingAppointment ? (
+            <button
+              onClick={() => setIsAddingAppointment(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              <Plus size={18} />
+              Add New Appointment
+            </button>
+          ) : (
+            <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+              <h4 className="font-semibold text-green-800 mb-3">Add New Appointment</h4>
+              <AddAppointmentForm
+                bornId={born.id}
+                babyId={born.babies?.[0]?.id}
+                onAddAppointment={async (newAppointment) => {
+                  await onAddAppointment(newAppointment);
+                  setIsAddingAppointment(false);
+                }}
+                onCancel={() => setIsAddingAppointment(false)}
+                axiosInstance={axiosInstance}
+              />
+            </div>
+          )}
+        </div>
+      )}
+{/* Visit Section - Now inline instead of modal */}
+      {userRole === 'data_manager' && (
+        <>
+          {!isAddingVisit ? (
+            <button
+              onClick={() => setIsAddingVisit(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Date of First home Visits
+            </button>
+          ) : (
+            <div className="md:col-span-2 bg-white p-4 rounded-lg shadow-md border border-gray-200">
+              <h4 className="font-semibold text-green-800 mb-3">Schedule Visit</h4>
+              <form onSubmit={handleVisitSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Visit Dates *
+                  </label>
+                  <input
+                    type="date"
+                    value={visitDate}
+                    onChange={(e) => setVisitDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                  />
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingVisit(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Saving...' : 'Save Visit'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </>
+      )}
+
+        {/* Reject Modal */}
+        {isRejectModalOpen && (
+  <div className="fixed inset-0 bg-green-50 bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 w-full max-w-md">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Reject Record</h2>
+        <button
+          onClick={() => setIsRejectModalOpen(false)}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <X size={24} />
+        </button>
+      </div>
+
+      <form onSubmit={handleRejectSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reason for Rejection *
+          </label>
+          <textarea
+            name="rejectReason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            required
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setIsRejectModalOpen(false)}
+            className="px-4 py-2 border border-gray-300 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Rejecting...' : 'Reject'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
     </div>
   );
 };
@@ -1573,9 +2198,7 @@ const EditBabyForm = ({ baby, onUpdate, onCancel, isLoading }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Birth Weight (kg) *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Birth Weight (g) *</label>
           <input
             type="number"
             step="0.1"
@@ -1589,7 +2212,7 @@ const EditBabyForm = ({ baby, onUpdate, onCancel, isLoading }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Discharge Weight (kg)
+            Discharge Weight (g)
           </label>
           <input
             type="number"
@@ -1639,7 +2262,7 @@ const EditBabyForm = ({ baby, onUpdate, onCancel, isLoading }) => {
                   </td>
                   <td className="py-2 px-3">
                     <input
-                      type="text"
+                      type="number"
                       name="dose"
                       value={med.dose}
                       onChange={(e) => handleMedicationChange(index, e)}
@@ -1711,6 +2334,7 @@ const EditForm = ({
   handleSectorChange,
   handleCellChange,
   handleVillageChange,
+  userRole,
 }) => {
   return (
     <div className="space-y-6">
@@ -1744,19 +2368,6 @@ const EditForm = ({
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mother's National ID *
-              </label>
-              <input
-                type="text"
-                name="motherNationalId"
-                value={formData.motherNationalId}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                required
-              />
-            </div>
           </div>
         </div>
 
@@ -1779,18 +2390,6 @@ const EditForm = ({
                 type="text"
                 name="fatherPhone"
                 value={formData.fatherPhone}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Father's National ID
-              </label>
-              <input
-                type="text"
-                name="fatherNationalId"
-                value={formData.fatherNationalId}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               />
@@ -1827,8 +2426,40 @@ const EditForm = ({
               <option value="Assisted">Assisted</option>
             </select>
           </div>
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Health Center *</label>
+  <label className="text-sm block font-medium text-gray-700 mb-1">Place of Birth *</label>
+  <select
+    name="delivery_place"
+    value={formData.delivery_place}
+    onChange={handleChange}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+    required
+  >
+    <option value="">Select Place of Birth</option>
+    <option value="home">Home</option>
+    <option value="in the way to health center">in the way to health center</option>
+    <option value="heath center">heath center</option>
+    <option value="kabutare district hospital">kabutare district hospital</option>
+  </select>
+</div>
+            
+        </div>
+      </div>
+
+              <div>
+              <label className="text-lg font-medium text-green-700 mb-3">Date of Discharge</label>
+              <input
+                type="date"
+                name="dateofDischarge"
+                value={formData.dateofDischarge}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+            <div>
+            <label className="text-lg font-medium text-green-700 mb-3">Health Center *</label>
             <select
               name="healthCenterId"
               value={formData.healthCenterId}
@@ -1843,35 +2474,6 @@ const EditForm = ({
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Leave Status *</label>
-            <select
-              name="leave"
-              value={formData.leave}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              required
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          <div className="hidden">
-            <label className="block text-sm hidden font-medium text-gray-700 mb-1">Status *</label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              required
-            >
-              <option value="go home">Go Home</option>
-              <option value="referred">Referred</option>
-              <option value="hospitalized">Hospitalized</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
       <div>
         <h3 className="text-lg font-medium text-green-700 mb-3">Location</h3>
@@ -1931,6 +2533,11 @@ const EditForm = ({
         </div>
       </div>
 
+      {/* Appointment Information */}
+          
+
+          
+
       {!isEditMode && (
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -1987,7 +2594,7 @@ const EditForm = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Birth Weight (kg) *
+                    Birth Weight (g) *
                   </label>
                   <input
                     type="number"
@@ -2001,7 +2608,7 @@ const EditForm = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Discharge Weight (kg) *
+                    Discharge Weight (g) *
                   </label>
                   <input
                     type="number"
@@ -2085,6 +2692,76 @@ const EditForm = ({
                   <p className="text-gray-500">No medications recorded</p>
                 )}
               </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm font-medium text-green-700 mb-3">Appointment Date</label>
+              <input
+                type="date"
+                name="dateofvisit"
+                value={formData.dateofvisit}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+          </div>
+              
+              {/* Add role-specific fields */}
+              {userRole === 'data_manager' && (
+                <div>
+                  <h3 className="text-lg font-medium text-green-700 mb-3">Visit Information</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Visit Dates
+                      </label>
+                      <input
+                        type="date"
+                        name="dateofvisit"
+                        value={formData.dateofvisit}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              
+              {userRole === 'pediatrition' && (
+                <div>
+                  <h3 className="text-lg font-medium text-green-700 mb-3">Discharge Information</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Discharge Date
+                      </label>
+                      <input
+                        type="date"
+                        name="dateofDischarge"
+                        value={formData.dateofDischarge}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Leave Status
+                      </label>
+                      <select
+                        name="leave"
+                        value={formData.leave}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        required
+                      >
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -2164,7 +2841,7 @@ const AddBabyModal = ({ isOpen, onClose, bornId, onAddBaby, axiosInstance }) => 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Birth Weight (kg) *
+              Birth Weight (g) *
             </label>
             <input
               type="number"
@@ -2179,7 +2856,7 @@ const AddBabyModal = ({ isOpen, onClose, bornId, onAddBaby, axiosInstance }) => 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Discharge Weight (kg)
+              Discharge Weight (g)
             </label>
             <input
               type="number"
@@ -2292,9 +2969,7 @@ const AddBabyForm = ({ bornId, onAddBaby, onCancel }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Birth Weight (kg) *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Birth Weight (g) *</label>
           <input
             type="number"
             step="0.01"
@@ -2309,7 +2984,7 @@ const AddBabyForm = ({ bornId, onAddBaby, onCancel }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Discharge Weight (kg)
+            Discharge Weight (g)
           </label>
           <input
             type="number"
@@ -2352,13 +3027,13 @@ const AddAppointmentForm = ({
   axiosInstance,
 }) => {
   const [formData, setFormData] = useState({
-    babyId: babyId,
-    bornId: bornId,
-    date: new Date().toISOString().split('T')[0],
-    time: '09:00',
-    purpose: '',
-    status: 'Scheduled',
-  });
+  babyId: babyId,
+  bornId: bornId,
+  date: new Date().toISOString().split('T')[0],
+  time: '09:00',
+  purpose: 'noted',
+  status: 'Scheduled', // Default value
+});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -2367,20 +3042,24 @@ const AddAppointmentForm = ({
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await onAddAppointment(formData);
-    } catch (error) {
-      console.error('Error adding appointment:', error);
-      // Swal.fire({
-      //   icon: 'error',
-      //   title: 'Failed to add appointment',
-      //   text: error.response?.data?.message || 'Please try again',
-      // });
-    } finally {
-      setIsLoading(false);
+  e.preventDefault();
+  try {
+    if (!formData.date || !formData.time || !formData.purpose) {
+      throw new Error('All fields are required');
     }
-  };
+
+    await onAddAppointment(formData);
+  } catch (error) {
+    console.error('Error adding appointment:', error);
+    Swal.fire({
+      icon: 'error',
+      title: 'Failed to add appointment',
+      text: error.message || 'Please try again',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -2404,17 +3083,6 @@ const AddAppointmentForm = ({
               type="time"
               name="time"
               value={formData.time}
-              onChange={handleChange}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              required
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Purpose *</label>
-            <input
-              type="text"
-              name="purpose"
-              value={formData.purpose}
               onChange={handleChange}
               className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               required
