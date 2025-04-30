@@ -19,6 +19,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { Switch } from '@headlessui/react';
 
 // Set base URL from environment variable
 const API_BASE_URL = import.meta.env.VITE_API_KEY;
@@ -216,6 +217,71 @@ function Sidebar({ sidebarOpen, toggleSidebar }) {
     if (onClick) onClick();
   };
 
+  // Add this state near your other state declarations
+const [notificationSettings, setNotificationSettings] = useState({
+  notify: 'no',
+  loading: false,
+});
+
+// Add this function to fetch notification settings
+const fetchNotificationSettings = async () => {
+  try {
+    const token = Cookies.get('token');
+    const response = await axios.get(`${API_BASE_URL}/borns/notification/get`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    setNotificationSettings({
+      notify: response.data.settings.notify, // or response.data.notify depending on your API
+      loading: false,
+    });
+  } catch (error) {
+    console.error('Error fetching notification settings:', error);
+    setNotificationSettings(prev => ({ ...prev, loading: false }));
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: error.response?.data?.message || 'Failed to fetch notification settings',
+    });
+  }
+};
+
+// Add this function to toggle notifications
+const toggleNotifications = async () => {
+  try {
+    setNotificationSettings(prev => ({ ...prev, loading: true }));
+    const token = Cookies.get('token');
+    
+    // Simple GET request without any parameters
+    await axios.get(`${API_BASE_URL}/borns/notification/switch`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    // Refetch the updated status
+    await fetchNotificationSettings();
+  } catch (error) {
+    console.error('Error toggling notifications:', error);
+    setNotificationSettings(prev => ({ ...prev, loading: false }));
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: error.response?.data?.message || 'Failed to update notification settings',
+    });
+  }
+};
+
+// Add this useEffect to load notification settings when the modal opens
+useEffect(() => {
+  if (showSettingsModal && activeTab === 'notification') {
+    fetchNotificationSettings();
+  }
+}, [showSettingsModal, activeTab]);
+
+
   const adminMenuItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/users', icon: User, label: 'Users' },
@@ -349,8 +415,17 @@ function Sidebar({ sidebarOpen, toggleSidebar }) {
                   >
                     Change Password
                   </button>
+                  <button
+                    onClick={() => setActiveTab('notification')}
+                    className={`${activeTab === 'notification' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  >
+                    Notifications
+                  </button>
+
                 </nav>
               </div>
+
+              
 
               {activeTab === 'profile' && userData && (
                 <div className="mt-6">
@@ -527,6 +602,48 @@ function Sidebar({ sidebarOpen, toggleSidebar }) {
                   </form>
                 </div>
               )}
+
+{activeTab === 'notification' && (
+  <div className="mt-6">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-medium text-gray-900">Email Notifications</h4>
+          <p className="text-sm text-gray-500">
+            {notificationSettings.notify === 'yes'
+              ? 'Notifications are currently enabled'
+              : 'Notifications are currently disabled'}
+          </p>
+        </div>
+        <Switch
+  checked={notificationSettings.notify === 'yes'}
+  onChange={toggleNotifications}  // Just call the function directly
+  disabled={notificationSettings.loading}
+  className={`${
+    notificationSettings.notify === 'yes' ? 'bg-green-600' : 'bg-gray-200'
+  } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2`}
+>
+  <span className="sr-only">Toggle notifications</span>
+  <span
+    className={`${
+      notificationSettings.notify === 'yes' ? 'translate-x-6' : 'translate-x-1'
+    } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+  />
+</Switch>
+      </div>
+    </div>
+
+    <div className="mt-6 flex justify-end">
+      <button
+        type="button"
+        onClick={() => setShowSettingsModal(false)}
+        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
             </div>
           </div>
         </div>
