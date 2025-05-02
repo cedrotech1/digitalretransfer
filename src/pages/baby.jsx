@@ -1653,33 +1653,40 @@ const ViewDetails = ({
           </p>
         </div>
       </div>
-
       <div>
-        <h3 className="text-lg font-medium text-green-700 mb-3">Discharge Information</h3>
-        <div className="bg-green-50 p-4 rounded grid grid-cols-1 md:grid-cols-3 gap-4">
-          <p>
-            <span className="font-semibold">Discharge Date:</span> {formatDateToDMY(born.dateofDischarge)}
-          </p>
-          
-          <p>
+  <h3 className="text-lg font-medium text-green-700 mb-3">Discharge Information</h3>
+  
+      <div className="bg-green-50 p-4 rounded space-y-4">
+        {/* Row: Discharge Date & Health Center (6-6) */}
+        <div className="flex flex-col md:flex-row md:gap-4">
+          <div className="w-full md:w-1/2">
+            <span className="font-semibold">Discharge Date:</span>{' '}
+            {born?.dateofDischarge ? formatDateToDMY(born.dateofDischarge) : 'N/A'}
+          </div>
+          <div className="w-full md:w-1/2">
             <span className="font-semibold">Health Center:</span>{' '}
-            {getNameFromId(born.healthCenterId, healthCenters)}
-          </p>
-          <p>
-            <span className="font-semibold">Sector:</span> {' '} 
-            {getNameFromId(born.sector_id, sectors)}
-          </p>
-          <p>
+            {born?.healthCenter?.name || 'N/A'}
+          </div>
+        </div>
+
+        {/* Row: Sector, Cell, Village (4-4-4) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <span className="font-semibold">Sector:</span>{' '}
+            {born?.sector?.name || 'N/A'}
+          </div>
+          <div>
             <span className="font-semibold">Cell:</span>{' '}
-            {getNameFromId(born.cell_id, cells, sectors)}
-          </p>
-          <p>
+            {born?.cell?.name || 'N/A'}
+          </div>
+          <div>
             <span className="font-semibold">Village:</span>{' '}
-            {getNameFromId(born.village_id, villages, sectors)}
-          </p>
-         
+            {born?.village?.name || 'N/A'}
+          </div>
         </div>
       </div>
+    </div>
+
       
 
       {/* Babies Section */}
