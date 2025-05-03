@@ -415,12 +415,15 @@ useEffect(() => {
                   >
                     Change Password
                   </button>
-                  <button
-                    onClick={() => setActiveTab('notification')}
-                    className={`${activeTab === 'notification' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                  >
-                    Notifications
-                  </button>
+                  
+                  {role === "data_manager" && (
+                    <button
+                      onClick={() => setActiveTab('notification')}
+                      className={`${activeTab === 'notification' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                    >
+                      Notifications
+                    </button>
+                  )}
 
                 </nav>
               </div>

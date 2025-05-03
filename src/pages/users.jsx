@@ -518,7 +518,7 @@ export default function UserManagementPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        {user.role.replace(/_/g, ' ').replace(/ at helthcenter/gi, '')}
+                      {user.role === "head_of_community_workers_at_helth_center" ? "In Charge Of Community Workers at HC" : user.role.replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
@@ -798,7 +798,8 @@ export default function UserManagementPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <p className="text-gray-800">{currentUser.role.replace(/_/g, ' ')}</p>
+                <p className="text-gray-800">{currentUser.role === "head_of_community_workers_at_helth_center" ? "In Charge Of Community Workers at HC" : currentUser.role.replace(/_/g, ' ')}</p>
+               
               </div>
 
               <div>

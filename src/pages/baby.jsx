@@ -2342,6 +2342,7 @@ const EditForm = ({
   handleCellChange,
   handleVillageChange,
   userRole,
+  isAddModalOpen,
 }) => {
   return (
     <div className="space-y-6">
@@ -2540,12 +2541,7 @@ const EditForm = ({
         </div>
       </div>
 
-      {/* Appointment Information */}
-          
-
-          
-
-      {!isEditMode && (
+      
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-medium text-green-700">Baby Information</h3>
@@ -2772,7 +2768,7 @@ const EditForm = ({
             </div>
           ))}
         </div>
-      )}
+      
     </div>
   );
 };
