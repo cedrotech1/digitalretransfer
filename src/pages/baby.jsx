@@ -340,14 +340,14 @@ const [rejectReason, setRejectReason] = useState('');
 
 
 
-  const updateBorn = async () => {
+const updateBorn = async (updatedBaby) => {
   if (!currentBorn?.id) return;
 
   try {
     setIsLoading(true);
 
-    // Prepare the data to send based on the provided structure
-    const dataToSend = {
+    // Prepare the data to send for the born record
+    const bornDataToSend = {
       dateOfBirth: formData.dateOfBirth,
       healthCenterId: formData.healthCenterId,
       motherName: formData.motherName,
@@ -364,28 +364,49 @@ const [rejectReason, setRejectReason] = useState('');
       dateofvisit: formData.dateofvisit,
     };
 
-    console.log('Updating born record with data:', dataToSend);
+    console.log('Updating born record with data:', bornDataToSend);
 
-    // Send the update request to the backend
-    const response = await axiosInstance.put(`/borns/${currentBorn.id}`, dataToSend);
+    // Update the born record
+    const bornResponse = await axiosInstance.put(`/borns/${currentBorn.id}`, bornDataToSend);
 
-    if (response.status === 200) {
-      console.log('Born record updated successfully:', response.data);
+    if (bornResponse.status === 200) {
+      console.log('Born record updated successfully:', bornResponse.data);
+
+      // Update the babies associated with the born record
+      for (const baby of formData.babies) {
+        const babyDataToSend = {
+          name: baby.name,
+          gender: baby.gender,
+          birthWeight: baby.birthWeight,
+          dischargebirthWeight: baby.dischargebirthWeight,
+          medications: baby.medications || [],
+        };
+
+        if (baby.id) {
+          // Update existing baby
+          console.log('Updating baby with ID:', baby.id, 'Data:', babyDataToSend);
+          await axiosInstance.put(`/babies/${baby.id}`, babyDataToSend);
+        } else {
+          // Create a new baby if it doesn't have an ID
+          console.log('Creating new baby with data:', babyDataToSend);
+          await axiosInstance.post(`/babies`, { ...babyDataToSend, bornId: currentBorn.id });
+        }
+      }
 
       // Refresh the born records and close the modal
       await fetchBorns();
       setIsEditMode(false);
       setIsViewModalOpen(false);
-      showAlert('success', 'Born record updated successfully');
+      showAlert('success', 'Born record and associated babies updated successfully');
     } else {
-      console.error('Failed to update born record:', response);
+      console.error('Failed to update born record:', bornResponse);
       showAlert('error', 'Failed to update born record');
     }
   } catch (err) {
-    console.error('Error updating born record:', err);
+    console.error('Error updating born record and babies:', err);
     showAlert(
       'error',
-      err.response?.data?.message || err.message || 'Failed to update born record'
+      err.response?.data?.message || err.message || 'Failed to update born record and babies'
     );
   } finally {
     setIsLoading(false);
@@ -2546,18 +2567,6 @@ const EditForm = ({
   </div>
 
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium text-green-700">Baby Information</h3>
-          <button
-            type="button"
-            onClick={addBaby}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Another Baby
-          </button>
-        </div>
-
         {formData.babies.map((baby, babyIndex) => (
           <div key={`baby-form-${babyIndex}`} className="mb-6 p-4 bg-green-50 rounded">
             <div className="flex justify-between items-center mb-4">
