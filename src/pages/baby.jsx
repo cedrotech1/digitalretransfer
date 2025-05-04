@@ -2523,6 +2523,7 @@ const EditForm = ({
       <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         Cell {formData?.cell?.name ? `(${formData.cell.name})` : ''}
+        
       </label>
         <select
           name="cell_id"
@@ -2533,7 +2534,7 @@ const EditForm = ({
           disabled={!formData.sector_id}
         >
         
-          <option value="">Select Cell</option>
+          <option value='' disabled>{formData?.cell?.name ? `${formData.cell.name}` : 'Select cell'}</option>
           {cells.map((cell) => (
             <option key={`cell-${cell.id}`} value={cell.id}>
               {cell.name}
@@ -2555,7 +2556,7 @@ const EditForm = ({
           disabled={!formData.cell_id}
         >
          
-          <option value="">Select Village</option>
+         <option value='' disabled>{formData?.village?.name ? `${formData.village.name}` : 'Select village'}</option>
           {villages.map((village) => (
             <option key={`village-${village.id}`} value={village.id}>
               {village.name}
