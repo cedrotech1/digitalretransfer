@@ -520,6 +520,9 @@ export default function UserManagementPage() {
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                       {user.role === "head_of_community_workers_at_helth_center" ? "In Charge Of Community Workers at HC" : user.role.replace(/_/g, ' ')}
                       </span>
+                      <br/>
+                      <i className='text-xs text-gray-600'>{user.HealthCenters ? user.HealthCenters.name : "" }</i>
+                      
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       <button
