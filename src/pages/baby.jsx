@@ -651,11 +651,11 @@ const updateBorn = async (updatedBaby) => {
   };
 
   const addBaby = () => {
-    setFormData((prev) => ({
-      ...prev,
-      babyCount: prev.babyCount + 1,
+    setFormData({
+      ...formData,
+      babyCount: formData.babyCount + 1,
       babies: [
-        ...prev.babies,
+        ...formData.babies,
         {
           name: '',
           gender: 'Male',
@@ -664,7 +664,7 @@ const updateBorn = async (updatedBaby) => {
           medications: [],
         },
       ],
-    }));
+    });
   };
 
   const removeBaby = (index) => {
@@ -2353,10 +2353,10 @@ const EditForm = ({
   handleCellChange,
   handleVillageChange,
   userRole,
-  isAddModalOpen,
 }) => {
   return (
     <div className="space-y-6">
+      {/* Parent Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 className="text-lg font-medium text-green-700 mb-3">Mother Information</h3>
@@ -2417,20 +2417,20 @@ const EditForm = ({
         </div>
       </div>
 
+      {/* Delivery Information */}
       <div>
         <h3 className="text-lg font-medium text-green-700 mb-3">Delivery Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth (MM/DD/YYYY)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth *</label>
             <input
-            type="date"
-            name="dateOfBirth"
-            value={formData.dateOfBirth ? formData.dateOfBirth.slice(0, 10) : ''}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            required
-          />
-
+              type="date"
+              name="dateOfBirth"
+              value={formData.dateOfBirth}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Type *</label>
@@ -2446,127 +2446,35 @@ const EditForm = ({
               <option value="Assisted">Assisted</option>
             </select>
           </div>
-          
           <div>
-    <label className="text-sm block font-medium text-gray-700 mb-1">Place of Birth *</label>
-    <select
-      name="delivery_place"
-      value={formData.delivery_place}
-      onChange={handleChange}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-      required
-    >
-    <option value="">Select Place of Birth</option>
-    <option value="home">Home</option>
-    <option value="in the way to health center">in the way to health center</option>
-    <option value="heath center">heath center</option>
-    <option value="kabutare district hospital">kabutare district hospital</option>
-  </select>
-</div>
-            
+            <label className="block text-sm font-medium text-gray-700 mb-1">Place of Birth *</label>
+            <select
+              name="delivery_place"
+              value={formData.delivery_place}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            >
+              <option value="">Select Place of Birth</option>
+              <option value="home">Home</option>
+              <option value="in the way to health center">In the way to health center</option>
+              <option value="health center">Health center</option>
+              <option value="kabutare district hospital">Kabutare District Hospital</option>
+            </select>
+          </div>
         </div>
       </div>
-
-      <div>
-              <label className="text-lg font-medium text-green-700 mb-3">Date of Discharge</label>
-              <input
-                type="date"
-                name="dateofDischarge"
-                
-                value={formData.dateofDischarge ? formData.dateofDischarge.slice(0, 10) : ''}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                required
-              />
-            </div>
-      <div>
-        <label className="text-lg font-medium text-green-700 mb-3">Health Center *</label>
-        <select
-          name="healthCenterId"
-          value={formData.healthCenterId}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
+      <button
+          type="button"
+          onClick={addBaby}
+          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center"
         >
-          {healthCenters.map((hc, index) => (
-            <option key={`hc-${hc.id}-${index}`} value={hc.id}>
-              {hc.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
+          <Plus className="h-4 w-4 mr-1" />
+          Add Another Baby
+        </button>
+      {/* Baby Information */}
       <div>
-    <h3 className="text-lg font-medium text-green-700 mb-3">Location</h3>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-  Sector {formData?.sector?.name ? `(${formData.sector.name})` : ''}
-</label>
-
-
-        <select
-          name="sector_id"
-          value={formData.sector_id}
-          onChange={handleSectorChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-        >
-          {sectors.map((sector) => (
-            <option key={`sector-${sector.id}`} value={sector.id}>
-              {sector.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Cell {formData?.cell?.name ? `(${formData.cell.name})` : ''}
-      </label>
-        <select
-          name="cell_id"
-          value={formData.cell_id}
-          onChange={handleCellChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-          disabled={!formData.sector_id}
-        >
-        
-          <option value="">Select Cell</option>
-          {cells.map((cell) => (
-            <option key={`cell-${cell.id}`} value={cell.id}>
-              {cell.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Village {formData?.village?.name ? `(${formData.village.name})` : ''}
-      </label>
-        <select
-          name="village_id"
-          value={formData.village_id}
-          onChange={handleVillageChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-          disabled={!formData.cell_id}
-        >
-         
-          <option value="">Select Village</option>
-          {villages.map((village) => (
-            <option key={`village-${village.id}`} value={village.id}>
-              {village.name}
-            </option>
-          ))}
-        </select>
-      </div>
-    </div>
-  </div>
-
-      <div>
+        <h3 className="text-lg font-medium text-green-700 mb-3">Baby Information</h3>
         {formData.babies.map((baby, babyIndex) => (
           <div key={`baby-form-${babyIndex}`} className="mb-6 p-4 bg-green-50 rounded">
             <div className="flex justify-between items-center mb-4">
@@ -2636,243 +2544,14 @@ const EditForm = ({
                 />
               </div>
             </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h5 className="font-semibold text-green-800">Medications</h5>
-                <button
-                  type="button"
-                  onClick={() => addMedication(babyIndex)}
-                  className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Medication
-                </button>
-              </div>
-
-              {baby.medications?.length > 0 ? (
-                <table className="w-full">
-                  <thead className="bg-green-100">
-                    <tr>
-                      <th className="text-left py-2 px-3">Medication</th>
-                      <th className="text-left py-2 px-3">Dose</th>
-                      <th className="text-left py-2 px-3">Frequency</th>
-                      <th className="text-left py-2 px-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {baby.medications.map((med, medIndex) => (
-                      <tr key={`med-${medIndex}`}>
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            name="name"
-                            value={med.name}
-                            onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
-                            className="w-full p-1 text-sm border rounded"
-                          />
-                        </td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            name="dose"
-                            value={med.dose}
-                            onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
-                            className="w-full p-1 text-sm border rounded"
-                          />
-                        </td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            name="frequency"
-                            value={med.frequency}
-                            onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
-                            className="w-full p-1 text-sm border rounded"
-                          />
-                        </td>
-                        <td className="py-2 px-3">
-                          <button
-                            type="button"
-                            onClick={() => removeMedication(babyIndex, medIndex)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-gray-500">No medications recorded</p>
-              )}
-            </div>
           </div>
         ))}
-      </div>
 
-      {!isEditMode && (
-       <div>
-       <div className="flex items-center justify-between mb-3">
-         <h3 className="text-lg font-medium text-green-700">Baby Information</h3>
-         <button
-           type="button"
-           onClick={addBaby}
-           className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center"
-         >
-           <Plus className="h-4 w-4 mr-1" />
-           Add Another Baby
-         </button>
-       </div>
-     
-       {formData.babies.map((baby, babyIndex) => (
-         <div key={`baby-form-${babyIndex}`} className="mb-6 p-4 bg-green-50 rounded">
-           <div className="flex justify-between items-center mb-4">
-             <h4 className="font-semibold text-green-800">Baby {babyIndex + 1}</h4>
-             {formData.babies.length > 1 && (
-               <button
-                 type="button"
-                 onClick={() => removeBaby(babyIndex)}
-                 className="text-red-600 hover:text-red-800"
-               >
-                 <X className="h-5 w-5" />
-               </button>
-             )}
-           </div>
-     
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-               <input
-                 type="text"
-                 name="name"
-                 value={baby.name}
-                 onChange={(e) => handleBabyChange(babyIndex, e)}
-                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                 required
-               />
-             </div>
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
-               <select
-                 name="gender"
-                 value={baby.gender}
-                 onChange={(e) => handleBabyChange(babyIndex, e)}
-                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                 required
-               >
-                 <option value="Male">Male</option>
-                 <option value="Female">Female</option>
-               </select>
-             </div>
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">
-                 Birth Weight (g) *
-               </label>
-               <input
-                 type="number"
-                 step="0.1"
-                 name="birthWeight"
-                 value={baby.birthWeight}
-                 onChange={(e) => handleBabyChange(babyIndex, e)}
-                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                 required
-               />
-             </div>
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">
-                 Discharge Weight (g) *
-               </label>
-               <input
-                 type="number"
-                 step="0.1"
-                 name="dischargebirthWeight"
-                 value={baby.dischargebirthWeight}
-                 onChange={(e) => handleBabyChange(babyIndex, e)}
-                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                 required
-               />
-             </div>
-           </div>
-     
-           <div>
-             <div className="flex items-center justify-between mb-2">
-               <h5 className="font-semibold text-green-800">Medications</h5>
-               <button
-                 type="button"
-                 onClick={() => addMedication(babyIndex)}
-                 className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center"
-               >
-                 <Plus className="h-3 w-3 mr-1" />
-                 Add Medication
-               </button>
-             </div>
-     
-             {baby.medications?.length > 0 ? (
-               <table className="w-full">
-                 <thead className="bg-green-100">
-                   <tr>
-                     <th className="text-left py-2 px-3">Medication</th>
-                     <th className="text-left py-2 px-3">Dose</th>
-                     <th className="text-left py-2 px-3">Frequency</th>
-                     <th className="text-left py-2 px-3">Actions</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {baby.medications.map((med, medIndex) => (
-                     <tr key={`med-${medIndex}`}>
-                       <td className="py-2 px-3">
-                         <input
-                           type="text"
-                           name="name"
-                           value={med.name}
-                           onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
-                           className="w-full p-1 text-sm border rounded"
-                         />
-                       </td>
-                       <td className="py-2 px-3">
-                         <input
-                           type="text"
-                           name="dose"
-                           value={med.dose}
-                           onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
-                           className="w-full p-1 text-sm border rounded"
-                         />
-                       </td>
-                       <td className="py-2 px-3">
-                         <input
-                           type="text"
-                           name="frequency"
-                           value={med.frequency}
-                           onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
-                           className="w-full p-1 text-sm border rounded"
-                         />
-                       </td>
-                       <td className="py-2 px-3">
-                         <button
-                           type="button"
-                           onClick={() => removeMedication(babyIndex, medIndex)}
-                           className="text-red-600 hover:text-red-800"
-                         >
-                           <X className="h-4 w-4" />
-                         </button>
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-             ) : (
-               <p className="text-gray-500">No medications recorded</p>
-             )}
-           </div>
-         </div>
-       ))}
-     </div>
-      )}
+        
+      </div>
     </div>
   );
 };
-
 // AddBabyModal Component
 const AddBabyModal = ({ isOpen, onClose, bornId, onAddBaby, axiosInstance }) => {
   const [formData, setFormData] = useState({
