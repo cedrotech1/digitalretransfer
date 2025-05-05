@@ -2474,7 +2474,76 @@ const EditForm = ({
         </button>
       {/* Baby Information */}
       <div>
-        <h3 className="text-lg font-medium text-green-700 mb-3">Baby Information</h3>
+    <h3 className="text-lg font-medium text-green-700 mb-3">Location</h3>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+  Sector {formData?.sector?.name ? `(${formData.sector.name})` : ''}
+</label>
+
+
+        <select
+          name="sector_id"
+          value={formData.sector_id}
+          onChange={handleSectorChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+          required
+        >
+          {sectors.map((sector) => (
+            <option key={`sector-${sector.id}`} value={sector.id}>
+              {sector.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Cell {formData?.cell?.name ? `(${formData.cell.name})` : ''}
+      </label>
+        <select
+          name="cell_id"
+          value={formData.cell_id}
+          onChange={handleCellChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+          required
+          disabled={!formData.sector_id}
+        >
+        
+          <option value="">Select Cell</option>
+          {cells.map((cell) => (
+            <option key={`cell-${cell.id}`} value={cell.id}>
+              {cell.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Village {formData?.village?.name ? `(${formData.village.name})` : ''}
+      </label>
+        <select
+          name="village_id"
+          value={formData.village_id}
+          onChange={handleVillageChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+          required
+          disabled={!formData.cell_id}
+        >
+         
+          <option value="">Select Village</option>
+          {villages.map((village) => (
+            <option key={`village-${village.id}`} value={village.id}>
+              {village.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  </div>
+
+      <div>
         {formData.babies.map((baby, babyIndex) => (
           <div key={`baby-form-${babyIndex}`} className="mb-6 p-4 bg-green-50 rounded">
             <div className="flex justify-between items-center mb-4">
