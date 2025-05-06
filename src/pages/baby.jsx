@@ -1,23 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  X,
-  Check,
-  AlertTriangle,
-  Save,
-  Baby,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import {Search, Plus, ChevronsLeft, ChevronRight, ChevronLeft
+  ,ChevronsRight, Eye, Trash2, X, AlertTriangle, Edit
+} from 'lucide-react';
 
 const BornPage = () => {
   const [loadingFeedback, setLoadingFeedback] = useState(false);
@@ -48,7 +35,7 @@ const BornPage = () => {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 const [rejectReason, setRejectReason] = useState('');
 
-  const [formData, setFormData] = useState({
+const [formData, setFormData] = useState({
   dateOfBirth: new Date().toISOString().split('T')[0],
   healthCenterId: '',
   motherName: '',
@@ -65,11 +52,11 @@ const [rejectReason, setRejectReason] = useState('');
   sector_id: '',
   cell_id: '',
   village_id: '',
-  dateofvisit: '',
+  appointmentDate: new Date().toISOString().split('T')[0], // Default to today's date
   comment: '',
   dateofDischarge: '',
-  appointmentTime: '09:00', // Default value
-  purpose: 'Initial Visit', // Default value
+  appointmentTime: '09:00', // Default time
+  purpose: 'Initial Visit', // Default purpose
   babies: [
     {
       name: '',
@@ -79,6 +66,12 @@ const [rejectReason, setRejectReason] = useState('');
       medications: [],
     },
   ],
+});
+
+const [appointmentData, setAppointmentData] = useState({
+  date: new Date().toISOString().split('T')[0],
+  time: '09:00',
+  purpose: 'Initial Visit'
 });
 
   const token = Cookies.get('token');
@@ -274,15 +267,21 @@ const [rejectReason, setRejectReason] = useState('');
     });
   };
 
-  const createBorn = async () => {
+
+// In your createBorn function:
+const createBorn = async () => {
   try {
     setIsLoading(true);
 
+    // Validate required fields
+    if (!formData.appointmentDate) {
+      throw new Error('Appointment date is required');
+    }
+
     // Step 1: Create the born record
-    const response = await axiosInstance.post('/borns', {
+    const bornResponse = await axiosInstance.post('/borns', {
       ...formData,
-      delivery_place: formData.delivery_place, // Ensure this is included
-      dateofvisit: formData.dateofvisit,
+      delivery_place: formData.delivery_place,
       dateofDischarge: formData.dateofDischarge,
       leave: formData.leave,
       status: 'pending',
@@ -292,46 +291,39 @@ const [rejectReason, setRejectReason] = useState('');
       })),
     });
 
-    console.log('Response from /borns API:', response.data); // Debug log
-
-    // Fix: Get bornId from newBorn object in the response
-    const bornId = response.data?.newBorn?.id;
+    const bornId = bornResponse.data?.newBorn?.id;
     if (!bornId) {
-      console.error('Failed to retrieve bornId from the response:', response.data);
       throw new Error('Failed to retrieve bornId from the response');
     }
 
-    // Step 2: Post an appointment for the created born record
-    if (formData.dateofvisit) {
-      const appointmentData = {
-        bornId, // Use the retrieved bornId
-        date: formData.dateofvisit,
-        time: formData.appointmentTime || '09:00', // Default to 09:00 if missing
-        purpose: formData.purpose || 'Initial Visit', // Default to "Initial Visit" if missing
-        status: 'Scheduled',
-      };
+    // Step 2: Create the appointment
+    const appointmentPayload = {
+      bornId,
+      babyId: formData.babies[0]?.id, // Assuming you want to associate with the first baby
+      date: formData.appointmentDate, // Ensure this is included
+      time: formData.appointmentTime || '09:00', // Default time
+      purpose: formData.purpose || 'Initial Visit', // Default purpose
+      status: 'Scheduled',
+    };
 
-      console.log('Posting appointment data:', appointmentData);
+    console.log('Creating appointment with:', appointmentPayload);
 
-      const appointmentResponse = await axiosInstance.post('/appointments', appointmentData);
+    const appointmentResponse = await axiosInstance.post('/appointments', appointmentPayload);
 
-      if (appointmentResponse.status === 201) {
-        console.log('Appointment created successfully:', appointmentResponse.data);
-      } else {
-        console.error('Failed to create appointment:', appointmentResponse);
-      }
+    if (appointmentResponse.status !== 201) {
+      throw new Error('Failed to create appointment');
     }
 
-    // Step 3: Refresh the born records and reset the form
+    // Refresh the born records and reset the form
     await fetchBorns();
     setIsAddModalOpen(false);
     resetForm();
     showAlert('success', 'Born record and appointment added successfully');
   } catch (err) {
-    console.error('Error creating born record:', err);
+    console.error('Error in createBorn:', err);
     showAlert(
       'error',
-      err.response?.data?.message || err.message || 'Failed to create born record'
+      err.response?.data?.message || err.message || 'Failed to create records'
     );
   } finally {
     setIsLoading(false);
@@ -339,8 +331,7 @@ const [rejectReason, setRejectReason] = useState('');
 };
 
 
-
-const updateBorn = async (updatedBaby) => {
+const updateBorn = async () => {
   if (!currentBorn?.id) return;
 
   try {
@@ -361,7 +352,9 @@ const updateBorn = async (updatedBaby) => {
       village_id: formData.village_id,
       leave: formData.leave,
       dateofDischarge: formData.dateofDischarge,
-      dateofvisit: formData.dateofvisit,
+      appointmentDate: formData.appointmentDate, // Ensure this is included
+      appointmentTime: formData.appointmentTime || '09:00', // Default time
+      purpose: formData.purpose || 'Initial Visit', // Default purpose
     };
 
     console.log('Updating born record with data:', bornDataToSend);
@@ -651,11 +644,11 @@ const updateBorn = async (updatedBaby) => {
   };
 
   const addBaby = () => {
-    setFormData({
-      ...formData,
-      babyCount: formData.babyCount + 1,
+    setFormData((prev) => ({
+      ...prev,
+      babyCount: prev.babyCount + 1,
       babies: [
-        ...formData.babies,
+        ...prev.babies,
         {
           name: '',
           gender: 'Male',
@@ -664,7 +657,7 @@ const updateBorn = async (updatedBaby) => {
           medications: [],
         },
       ],
-    });
+    }));
   };
 
   const removeBaby = (index) => {
@@ -1222,23 +1215,25 @@ const handleRejectSubmit = async (e) => {
                 </div>
               ) : (
                 <EditForm
-                  isEditMode={isEditMode}
-                  formData={formData}
-                  handleChange={handleChange}
-                  handleBabyChange={handleBabyChange}
-                  handleMedicationChange={handleMedicationChange}
-                  addBaby={addBaby}
-                  removeBaby={removeBaby}
-                  addMedication={addMedication}
-                  removeMedication={removeMedication}
-                  sectors={sectors}
-                  cells={cells}
-                  villages={villages}
-                  healthCenters={healthCenters}
-                  handleSectorChange={handleSectorChange}
-                  handleCellChange={handleCellChange}
-                  handleVillageChange={handleVillageChange}
-                />
+  isEditMode={isEditMode}
+  formData={formData}
+  handleChange={handleChange}
+  handleBabyChange={handleBabyChange}
+  handleMedicationChange={handleMedicationChange}
+  addBaby={addBaby}
+  removeBaby={removeBaby}
+  addMedication={addMedication}
+  removeMedication={removeMedication}
+  sectors={sectors}
+  cells={cells}
+  villages={villages}
+  healthCenters={healthCenters}
+  handleSectorChange={handleSectorChange}
+  handleCellChange={handleCellChange}
+  handleVillageChange={handleVillageChange}
+  appointmentData={appointmentData} // Pass appointmentData here
+  setAppointmentData={setAppointmentData} // Pass setAppointmentData here
+/>
               )}
             </div>
 
@@ -1344,23 +1339,25 @@ const handleRejectSubmit = async (e) => {
                 </div>
               ) : isEditMode ? (
                 <EditForm
-                  isEditMode={isEditMode}
-                  formData={formData}
-                  handleChange={handleChange}
-                  handleBabyChange={handleBabyChange}
-                  handleMedicationChange={handleMedicationChange}
-                  addBaby={addBaby}
-                  removeBaby={removeBaby}
-                  addMedication={addMedication}
-                  removeMedication={removeMedication}
-                  sectors={sectors}
-                  cells={cells}
-                  villages={villages}
-                  healthCenters={healthCenters}
-                  handleSectorChange={handleSectorChange}
-                  handleCellChange={handleCellChange}
-                  handleVillageChange={handleVillageChange}
-                />
+  isEditMode={isEditMode}
+  formData={formData}
+  handleChange={handleChange}
+  handleBabyChange={handleBabyChange}
+  handleMedicationChange={handleMedicationChange}
+  addBaby={addBaby}
+  removeBaby={removeBaby}
+  addMedication={addMedication}
+  removeMedication={removeMedication}
+  sectors={sectors}
+  cells={cells}
+  villages={villages}
+  healthCenters={healthCenters}
+  handleSectorChange={handleSectorChange}
+  handleCellChange={handleCellChange}
+  handleVillageChange={handleVillageChange}
+  appointmentData={appointmentData} // Pass appointmentData here
+  setAppointmentData={setAppointmentData} // Pass setAppointmentData here
+/>
               ) : (
                 <ViewDetails
   born={currentBorn}
@@ -2353,10 +2350,21 @@ const EditForm = ({
   handleCellChange,
   handleVillageChange,
   userRole,
+  isAddModalOpen,
+  appointmentData, // Add this prop
+  setAppointmentData, 
 }) => {
+  // Add this handler
+  const handleAppointmentChange = (e) => {
+    const { name, value } = e.target;
+    setAppointmentData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   return (
     <div className="space-y-6">
-      {/* Parent Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 className="text-lg font-medium text-green-700 mb-3">Mother Information</h3>
@@ -2417,20 +2425,20 @@ const EditForm = ({
         </div>
       </div>
 
-      {/* Delivery Information */}
       <div>
         <h3 className="text-lg font-medium text-green-700 mb-3">Delivery Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth (MM/DD/YYYY)</label>
             <input
-              type="date"
-              name="dateOfBirth"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              required
-            />
+            type="date"
+            name="dateOfBirth"
+            value={formData.dateOfBirth ? formData.dateOfBirth.slice(0, 10) : ''}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
+          />
+
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Type *</label>
@@ -2446,33 +2454,56 @@ const EditForm = ({
               <option value="Assisted">Assisted</option>
             </select>
           </div>
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Place of Birth *</label>
-            <select
-              name="delivery_place"
-              value={formData.delivery_place}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              required
-            >
-              <option value="">Select Place of Birth</option>
-              <option value="home">Home</option>
-              <option value="in the way to health center">In the way to health center</option>
-              <option value="health center">Health center</option>
-              <option value="kabutare district hospital">Kabutare District Hospital</option>
-            </select>
-          </div>
+    <label className="text-sm block font-medium text-gray-700 mb-1">Place of Birth *</label>
+    <select
+      name="delivery_place"
+      value={formData.delivery_place}
+      onChange={handleChange}
+      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+      required
+    >
+    <option value="">Select Place of Birth</option>
+    <option value="home">Home</option>
+    <option value="in the way to health center">in the way to health center</option>
+    <option value="heath center">heath center</option>
+    <option value="kabutare district hospital">kabutare district hospital</option>
+  </select>
+</div>
+            
         </div>
       </div>
-      <button
-          type="button"
-          onClick={addBaby}
-          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center"
+
+      <div>
+              <label className="text-lg font-medium text-green-700 mb-3">Date of Discharge</label>
+              <input
+                type="date"
+                name="dateofDischarge"
+                
+                value={formData.dateofDischarge ? formData.dateofDischarge.slice(0, 10) : ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+      <div>
+        <label className="text-lg font-medium text-green-700 mb-3">Health Center *</label>
+        <select
+          name="healthCenterId"
+          value={formData.healthCenterId}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+          required
         >
-          <Plus className="h-4 w-4 mr-1" />
-          Add Another Baby
-        </button>
-      {/* Baby Information */}
+          {healthCenters.map((hc, index) => (
+            <option key={`hc-${hc.id}-${index}`} value={hc.id}>
+              {hc.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div>
     <h3 className="text-lg font-medium text-green-700 mb-3">Location</h3>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2500,6 +2531,7 @@ const EditForm = ({
       <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         Cell {formData?.cell?.name ? `(${formData.cell.name})` : ''}
+        
       </label>
         <select
           name="cell_id"
@@ -2510,7 +2542,7 @@ const EditForm = ({
           disabled={!formData.sector_id}
         >
         
-          <option value="">Select Cell</option>
+          <option value='' disabled>{formData?.cell?.name ? `${formData.cell.name}` : 'Select cell'}</option>
           {cells.map((cell) => (
             <option key={`cell-${cell.id}`} value={cell.id}>
               {cell.name}
@@ -2532,7 +2564,7 @@ const EditForm = ({
           disabled={!formData.cell_id}
         >
          
-          <option value="">Select Village</option>
+         <option value='' disabled>{formData?.village?.name ? `${formData.village.name}` : 'Select village'}</option>
           {villages.map((village) => (
             <option key={`village-${village.id}`} value={village.id}>
               {village.name}
@@ -2554,7 +2586,14 @@ const EditForm = ({
                   onClick={() => removeBaby(babyIndex)}
                   className="text-red-600 hover:text-red-800"
                 >
-                  <X className="h-5 w-5" />
+                  {isEditMode?(
+                    <>
+                  </>
+                  ):
+                  (<>
+                    <X className="h-5 w-5" />
+                  </>)}
+                  
                 </button>
               )}
             </div>
@@ -2589,8 +2628,9 @@ const EditForm = ({
                   Birth Weight (g) *
                 </label>
                 <input
-                  type="number"
-                  step="0.1"
+                 type="number"  
+                  step="1"
+                   min="0"
                   name="birthWeight"
                   value={baby.birthWeight}
                   onChange={(e) => handleBabyChange(babyIndex, e)}
@@ -2603,24 +2643,141 @@ const EditForm = ({
                   Discharge Weight (g) *
                 </label>
                 <input
-                  type="number"
-                  step="0.1"
-                  name="dischargebirthWeight"
-                  value={baby.dischargebirthWeight}
-                  onChange={(e) => handleBabyChange(babyIndex, e)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                  required
-                />
+                type="number"
+                step="1"
+                min="0"
+                name="dischargebirthWeight"
+                value={baby.dischargebirthWeight}
+                onChange={(e) => handleBabyChange(babyIndex, e)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+
+
               </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="font-semibold text-green-800">Medications</h5>
+
+                {isEditMode?(
+                    <>
+                  </>
+                  ):
+                  (<>
+                    <button
+                  type="button"
+                  onClick={() => addMedication(babyIndex)}
+                  className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Medication
+                </button>
+                  </>)}
+                
+              </div>
+
+              {baby.medications?.length > 0 ? (
+                <table className="w-full">
+                  <thead className="bg-green-100">
+                    <tr>
+                      <th className="text-left py-2 px-3">Medication</th>
+                      <th className="text-left py-2 px-3">Dose</th>
+                      <th className="text-left py-2 px-3">Frequency</th>
+                      <th className="text-left py-2 px-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {baby.medications.map((med, medIndex) => (
+                      <tr key={`med-${medIndex}`}>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            name="name"
+                            value={med.name}
+                            onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
+                            className="w-full p-1 text-sm border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            name="dose"
+                            value={med.dose}
+                            onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
+                            className="w-full p-1 text-sm border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            name="frequency"
+                            value={med.frequency}
+                            onChange={(e) => handleMedicationChange(babyIndex, medIndex, e)}
+                            className="w-full p-1 text-sm border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <button
+                            type="button"
+                            onClick={() => removeMedication(babyIndex, medIndex)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            
+                    <X className="h-5 w-5" />
+                
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-gray-500">No medications recorded</p>
+              )}
             </div>
           </div>
         ))}
+        {!isEditMode && (
+          
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Appointment Date *
+          </label>
+          <input
+            type="date"
+            name="appointmentDate"
+            value={formData.appointmentDate ? formData.appointmentDate.slice(0, 10) : ''}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
+          />
+        </div>
+        )}
+      </div>
+{isEditMode?(<>
+
+</>)
+:(
+  <>
+         <button
+           type="button"
+           onClick={addBaby}
+           className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center"
+         >
+           <Plus className="h-4 w-4 mr-1" />
+           Add Another Baby
+         </button>
+  </>
+)}
+     
 
         
-      </div>
     </div>
   );
 };
+
 // AddBabyModal Component
 const AddBabyModal = ({ isOpen, onClose, bornId, onAddBaby, axiosInstance }) => {
   const [formData, setFormData] = useState({
@@ -2874,17 +3031,15 @@ const AddAppointmentForm = ({
   babyId,
   onAddAppointment,
   onCancel,
-  onSuccess,
-  axiosInstance,
 }) => {
   const [formData, setFormData] = useState({
-  babyId: babyId,
-  bornId: bornId,
-  date: new Date().toISOString().split('T')[0],
-  time: '09:00',
-  purpose: 'noted',
-  status: 'Scheduled', // Default value
-});
+    babyId: babyId,
+    bornId: bornId,
+    date: new Date().toISOString().split('T')[0], // Default to today's date
+    time: '09:00', // Default time
+    purpose: 'Initial Visit', // Default purpose
+    status: 'Scheduled', // Default status
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -2893,24 +3048,25 @@ const AddAppointmentForm = ({
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    if (!formData.date || !formData.time || !formData.purpose) {
-      throw new Error('All fields are required');
-    }
+    e.preventDefault();
+    try {
+      if (!formData.date || !formData.time || !formData.purpose) {
+        throw new Error('All fields are required');
+      }
 
-    await onAddAppointment(formData);
-  } catch (error) {
-    console.error('Error adding appointment:', error);
-    Swal.fire({
-      icon: 'error',
-      title: 'Failed to add appointment',
-      text: error.message || 'Please try again',
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+      setIsLoading(true);
+      await onAddAppointment(formData); // Pass the form data to the parent handler
+    } catch (error) {
+      console.error('Error adding appointment:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to add appointment',
+        text: error.message || 'Please try again',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -2940,19 +3096,15 @@ const AddAppointmentForm = ({
             />
           </div>
           <div>
-            <label className="hidden text-sm font-medium text-gray-700 mb-1">Status *</label>
-            <select
-              name="status"
-              value={formData.status}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Purpose *</label>
+            <input
+              type="text"
+              name="purpose"
+              value={formData.purpose}
               onChange={handleChange}
               className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              // required
-              hidden
-            >
-              <option value="Scheduled">Scheduled</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
+              required
+            />
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
