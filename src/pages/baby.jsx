@@ -273,11 +273,6 @@ const createBorn = async () => {
   try {
     setIsLoading(true);
 
-    // Validate required fields
-    if (!formData.appointmentDate) {
-      throw new Error('Appointment date is required');
-    }
-
     // Step 1: Create the born record
     const bornResponse = await axiosInstance.post('/borns', {
       ...formData,
@@ -296,29 +291,31 @@ const createBorn = async () => {
       throw new Error('Failed to retrieve bornId from the response');
     }
 
-    // Step 2: Create the appointment
-    const appointmentPayload = {
-      bornId,
-      babyId: formData.babies[0]?.id, // Assuming you want to associate with the first baby
-      date: formData.appointmentDate, // Ensure this is included
-      time: formData.appointmentTime || '09:00', // Default time
-      purpose: formData.purpose || 'Initial Visit', // Default purpose
-      status: 'Scheduled',
-    };
+    // Step 2: Conditionally create the appointment if appointmentDate is provided
+    if (formData.appointmentDate) {
+      const appointmentPayload = {
+        bornId,
+        babyId: formData.babies[0]?.id, // Optional: Associate with first baby
+        date: formData.appointmentDate,
+        time: formData.appointmentTime || '09:00',
+        purpose: formData.purpose || 'Initial Visit',
+        status: 'Scheduled',
+      };
 
-    console.log('Creating appointment with:', appointmentPayload);
+      console.log('Creating appointment with:', appointmentPayload);
 
-    const appointmentResponse = await axiosInstance.post('/appointments', appointmentPayload);
+      const appointmentResponse = await axiosInstance.post('/appointments', appointmentPayload);
 
-    if (appointmentResponse.status !== 201) {
-      throw new Error('Failed to create appointment');
+      if (appointmentResponse.status !== 201) {
+        throw new Error('Failed to create appointment');
+      }
     }
 
     // Refresh the born records and reset the form
     await fetchBorns();
     setIsAddModalOpen(false);
     resetForm();
-    showAlert('success', 'Born record and appointment added successfully');
+    showAlert('success', 'Born record added successfully' + (formData.appointmentDate ? ' with appointment' : ''));
   } catch (err) {
     console.error('Error in createBorn:', err);
     showAlert(
@@ -329,6 +326,7 @@ const createBorn = async () => {
     setIsLoading(false);
   }
 };
+
 
 
 const updateBorn = async () => {
@@ -2751,7 +2749,7 @@ const EditForm = ({
             value={formData.appointmentDate ? formData.appointmentDate.slice(0, 10) : ''}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            required
+            // required
           />
         </div>
         )}
