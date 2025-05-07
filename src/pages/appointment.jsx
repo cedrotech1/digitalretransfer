@@ -592,26 +592,40 @@ const AppointmentPage = () => {
                             {currentAppointment.status}
                           </span>
                         </p>
+                        <p className="inline-block text-sm italic bg-gray-100 px-2 py-1 rounded">
+                        <span className="font-semibold">Recorded at:</span>{' '}
+                        {formatDateToDMY(currentAppointment.createdAt)}
+                      </p>
+
+
+
                       </div>
                     </div>
 
                     {currentAppointment.birthRecord && (
                       <div>
                         <h3 className="text-lg font-medium text-green-700 mb-3">
-                          Patient Information
+                          Parents Information
                         </h3>
                         <div className="space-y-2">
-                          <p>
-                            <span className="font-semibold">Mother:</span>{' '}
-                            {currentAppointment.birthRecord.motherName}
-                          </p>
-                          {currentAppointment.birthRecord.fatherName && (
                             <p>
-                              <span className="font-semibold">Father:</span>{' '}
-                              {currentAppointment.birthRecord.fatherName}
+                              <span className="font-semibold">Mother:</span>{' '}
+                              {currentAppointment.birthRecord.motherName} <br />
+                              {currentAppointment.birthRecord.motherPhone && (
+                                <>phone: {currentAppointment.birthRecord.motherPhone}</>
+                              )}
                             </p>
-                          )}
-                        </div>
+                            {currentAppointment.birthRecord.fatherName && (
+                              <p>
+                                <span className="font-semibold">Father:</span>{' '}
+                                {currentAppointment.birthRecord.fatherName} <br />
+                                {currentAppointment.birthRecord.fatherPhone && (
+                                  <>phone: {currentAppointment.birthRecord.fatherPhone}</>
+                                )}
+                              </p>
+                            )}
+                          </div>
+
                       </div>
                     )}
                   </div>
