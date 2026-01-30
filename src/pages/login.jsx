@@ -11,6 +11,7 @@ function Login({ setIsAuthenticated }) {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const API_BASE_URL = import.meta.env.VITE_API_KEY;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -35,7 +36,7 @@ function Login({ setIsAuthenticated }) {
     try {
       // Make API request to login endpoint
       const response = await axios.post(
-        "https://digitalbackend-uobz.onrender.com/api/v1/auth/login",
+        `${API_BASE_URL}/auth/login`,
         {
           email: formData.email,
           password: formData.password
