@@ -27,7 +27,7 @@ const ProtectedRoute = ({ children }) => {
   return <MainLayout>{children}</MainLayout>;
 };
 
-// Public Route Component
+// Public Route Component 1
 const PublicRoute = ({ children }) => {
   const email = Cookies.get('email');
   const token = Cookies.get('token');
@@ -97,7 +97,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/report"
           element={
